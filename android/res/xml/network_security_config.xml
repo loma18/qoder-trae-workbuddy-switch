@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Buddy Switch 服务端是本机 / 局域网 HTTP（默认 127.0.0.1:57890），没有 TLS 证书。
+  因此显式允许明文流量；仅用于连接用户自己在「设置」里填写的地址。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Buddy Switch Agent</string>
+    <string name="channel_checkin">自动签到</string>
+    <string name="channel_checkin_desc">定时签到结果与异常提醒</string>
+</resources>
