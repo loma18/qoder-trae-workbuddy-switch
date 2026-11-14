@@ -2,7 +2,7 @@
 
 **手机独立完成 WorkBuddy / Qoder / Trae 的登录、签到、领积分、查余额；账号信息同步到电脑是可选的。**
 
-产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 6 / 2.1.1）。
+产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 7 / 2.1.2）。
 
 > ### 版本沿革
 >
@@ -11,12 +11,20 @@
 >   改用 WorkBuddy 官方 `/v2/plugin/auth/*` 扫码协议，手机独立登录与签到。
 > - **v2.1**：新增 **Qoder 独立扫码登录** 与 **Trae 粘贴 JWT 后独立签到**，
 >   协议取自 `qoder-trae-workbuddy-switch` dev 分支的 Rust core。
-> - **v2.1.1（本次）**：修复 **Qoder 签到提示「跳过」**。v2.1.0 只打已废弃的
+> - **v2.1.1**：修复 **Qoder 签到提示「跳过」**。v2.1.0 只打已废弃的
 >   `/sash/api/v1/me/daily-check-in/*` 通道，该通道国内版 `DISABLED`、国际版 404，
 >   遇 404 就直接返回 `skipped`。现改为对齐 Rust core `checkin.rs` /
 >   `campaign.rs` 的**活动平台优先**通道：`GET /sash/api/v1/me/campaigns` →
 >   逐条 `POST /{id}/claim` 领取「每日 100 Credits」，旧通道仅在活动平台整区
 >   404/405/410（并重试确认）时兜底。详见 [docs/API-CONTRACT.md](docs/API-CONTRACT.md)。
+> - **v2.1.2（本次）**：修复 **Trae 国际版签到 / 查积分全部 404**。根因是 v2.1 把
+>   「国际版账号网关」`grow-normal.trae.ai` 误当成「签到 / 积分 API 网关」——
+>   实测 `/trae/api/v2/*` 只挂载在**国内官方网关 `api.trae.cn`**，国际网关只代理
+>   OAuth/账号路由（`/trae/api/v3/oauth/*`），打 v2 一律 nginx 404。参考实现
+>   `credits.rs::post_json` 固定 `TraeVariant::default()`、`endpoints_for` 只返回
+>   `cn_endpoints`，即国际版账号的签到也发往 `api.trae.cn`。现改为**主通道统一
+>   `api.trae.cn`（与 variant 无关）**、国际网关仅作回落，自动跳过网关级 404；
+>   全无路由判「未开放」，鉴权被拒给出可操作诊断，不再虚报成功或抛莫名 404。
 
 ## 能做什么
 
@@ -41,6 +49,18 @@
 设备请求头**（`device::derive(user_id)`）。因此从桌面客户端导出一次 JWT 后，
 手机即可长期独立签到、领积分、查余额，不再依赖电脑。JWT 的 `data.id` 会自动解析成 uid。
 
+> **网关单一来源（v2.1.2 修正）**：`/trae/api/v2/ug/checkin_credits/{status,claim}` 与
+> `/trae/api/v2/pay/ide_user_ent_usage` **只挂载在国内官方网关 `https://api.trae.cn`**。
+> 国际版 `https://grow-normal.trae.ai` 是**账号 / OAuth 网关**（只代理
+> `/trae/api/v3/oauth/*`、`/cloudide/api/v3/*`），并没有这套 v2 路由——实测打过去一律
+> nginx 404。因此 App 的签到 / 积分**主通道恒为 `api.trae.cn`，与国内版 / 国际版选择无关**，
+> 国际账号网关仅作回落候选。这也与参考实现一致：`credits.rs::post_json` 固定
+> `TraeVariant::default()`，`mod.rs::endpoints_for` 只返回 `cn_endpoints`。
+>
+> **国际版账号的现实边界**：`region.rs` 明确 CN 与国际是**两套互不相通的账号体系、JWT 不通用**。
+> 国际版 JWT 打到国内网关可能返回「未开放 / 鉴权被拒」，App 会如实给出诊断而不是伪造成功。
+> 若确属国际版账号，签到 / 查积分请以电脑端 Trae 客户端为准。
+
 ## 快速开始
 
 1. 安装 `dist/agent.apk`（需允许「未知来源」；v2.0.0 起可直接覆盖升级，不必卸载）。
@@ -54,6 +74,8 @@
 > Qoder 签到请用**扫码登录**取得的 access token；`pt-` 开头的 PAT 只能查额度，
 > 上游不允许用于活动平台领取。若活动列表里没有积分类活动，界面如实显示「未开放」
 > 而不是「跳过」或「成功」（不会谎报领取）。
+> **Trae 国际版**：签到 / 积分统一走 `api.trae.cn`；若上游因账号体系不通拒绝，
+> 界面显示「未开放」或明确鉴权诊断，可在报告页查看完整说明。
 
 **可选同步**：「同步」页填电脑局域网 IP / 端口（默认 57900）/ 配对码 → 测试连接 →
 推送账号。协议与 workbuddy-console 的 `server/lansync/*` 一致。不填、不点，App 完全正常工作。
@@ -79,7 +101,7 @@ assets/index.html  ←→  JsBridge.call(cbId, action, args)  ←→  PlatformRo
 | `src/.../Platforms.java` | 三平台能力矩阵、标签、是否支持扫码 |
 | `src/.../PlatformRouter.java` | 按账号平台分派签到 / 领积分 / 查额度 / 刷新 |
 | `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、活动平台签到（campaigns + claim）、额度 |
-| `src/.../TraeApi.java` | Trae JWT 解析与导入、签到、权益包聚合 |
+| `src/.../TraeApi.java` | Trae JWT 解析与导入、`api.trae.cn` 主通道多网关自适应签到 / 积分、权益包聚合、网关级 404 / 鉴权诊断 |
 | `src/.../WorkBuddyApi.java` | WorkBuddy 登录、签到、成长中心、积分、刷新、lansync |
 | `src/.../WbVariant.java` | WorkBuddy 国内 / 国际档位域名与指纹头 |
 | `src/.../AccountStore.java` | 本机账号库，`platform` 字段隔离三平台（历史数据默认 wb） |
@@ -109,7 +131,7 @@ ALLOW_REBUILD=1 ./build.sh       # 同一 versionCode 内只改资源 / SPA 时�
 | 版本号单一数据源 | `build.sh` 从 `AndroidManifest.xml` 读取，不再硬编码 |
 | 依次升号 | 已有 `dist/agent.apk` 时要求新 `versionCode` 严格大于旧值，否则拒绝构建 |
 
-当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）→ v2.1.1（6）均可直接覆盖安装**；
+当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）→ v2.1.1（6）→ v2.1.2（7）均可直接覆盖安装**；
 v1.x 的私钥已永久丢失，那两个历史版本升级需卸载最后一次。
 换机 / 重新 clone 后构建必须带上整个 `signing/` 目录，详见 [signing/README.md](signing/README.md)。
 

@@ -22,11 +22,23 @@ import java.util.UUID;
  * 设备请求头</b>（device::derive(user_id)）。所以用户从桌面客户端导出一次 JWT 后，
  * 手机即可长期独立签到、领积分、查余额，不再依赖电脑。
  *
- * <p>对齐 crates/buddy-switch-core/src/modules/trae/{jwt,credits,checkin,mod}.rs。
+ * <p><b>网关单一来源（v2.1.2 修正）</b>：{@code /trae/api/v2/*} 只挂载在国内官方网关
+ * {@code api.trae.cn}；国际版 {@code grow-normal.trae.ai} 是<b>账号 / OAuth 网关</b>
+ * （只代理 /trae/api/v3/oauth/*、/cloudide/api/v3/*），并没有这套签到 / 积分路由。
+ * 参考实现 {@code credits.rs::post_json} 固定 {@code TraeVariant::default()}，
+ * {@code mod.rs::endpoints_for} 只返回 {@code cn_endpoints} —— 国际版账号的签到也是发往
+ * {@code api.trae.cn}。因此这里<b>不按 variant 切换主通道</b>，国际账号网关仅作回落候选。
+ *
+ * <p>对齐 crates/buddy-switch-core/src/modules/trae/{jwt,credits,checkin,mod,variant}.rs。
  */
 public final class TraeApi {
+    /** 签到 / 积分 API 网关：{@code /trae/api/v2/*} 唯一实测挂载点。 */
     private static final String CN_BASE = "https://api.trae.cn";
-    private static final String AI_BASE = "https://grow-normal.trae.ai";
+    /**
+     * 国际版「账号 / OAuth」网关，仅作上游迁移后的回落候选。
+     * ⚠️ 实测其 {@code /trae/api/v2/*} 全部 nginx 404 —— 绝不作为签到 / 积分主通道。
+     */
+    private static final String AI_ACCOUNT_BASE = "https://grow-normal.trae.ai";
 
     private static final String P_STATUS = "/trae/api/v2/ug/checkin_credits/status";
     private static final String P_CLAIM = "/trae/api/v2/ug/checkin_credits/claim";
@@ -45,8 +57,14 @@ public final class TraeApi {
 
     private TraeApi() { }
 
-    private static String base(String variant) {
-        return "ai".equals(variant) ? AI_BASE : CN_BASE;
+    /**
+     * 签到 / 积分网关候选，主通道恒为 {@link #CN_BASE}（与 variant 无关）。
+     * 国际版账号额外挂一个账号网关作回落：若上游把 v2 路由迁过去仍能自动适配。
+     */
+    private static String[] bases(String variant) {
+        return "ai".equals(variant)
+                ? new String[]{CN_BASE, AI_ACCOUNT_BASE}
+                : new String[]{CN_BASE};
     }
 
     // ------------------------------------------------------------------ 凭据导入
@@ -67,7 +85,7 @@ public final class TraeApi {
         try {
             long exp = payload.optLong("exp", 0L);
             acc.put("expiresAt", exp);
-            acc.put("domain", base(v));
+            acc.put("domain", CN_BASE);
         } catch (Exception ignored) { }
         AccountStore.put(ctx, acc);
         Prefs.log(ctx, "Trae " + Platforms.variantLabel(v) + " JWT 已导入：" + nick);
@@ -79,7 +97,7 @@ public final class TraeApi {
 
     // ------------------------------------------------------------------ 签到 / 积分
 
-    /** 签到领积分：先 status（checked_in），未签再 claim。 */
+    /** 签到领积分：先 status（checked_in），未签再 claim。两跳都走 {@link #postAny}。 */
     public static JSONObject checkinOne(Context ctx, JSONObject acc) {
         String v = variantOf(acc);
         String uid = acc.optString("uid", "");
@@ -88,15 +106,19 @@ public final class TraeApi {
         if (uid.isEmpty()) return fail("账号缺少 userId，请重新导入 JWT");
         Map<String, String> h = buildHeaders(ctx, jwt, uid);
 
-        Http.Resp st = Http.request("POST", base(v) + P_STATUS, h, "{}", 12000, 20000);
+        Http.Resp st = postAny(variantOf(acc), P_STATUS, h, "{}", 20000);
+        if (st == null) return noRoute(v);
+        if (isAuthReject(st)) return authRejected(v);
         if (st.error == null && st.ok()) {
             JSONObject s = obj(st.body);
             if (s.optBoolean("checked_in", false) || s.optBoolean("checkedIn", false)) {
                 return skipped("今日已签到");
             }
         }
-        Http.Resp cl = Http.request("POST", base(v) + P_CLAIM, h, "{}", 12000, 20000);
+        Http.Resp cl = postAny(variantOf(acc), P_CLAIM, h, "{}", 20000);
+        if (cl == null) return noRoute(v);
         if (cl.error != null) return fail("网络不可达：" + cl.error);
+        if (isAuthReject(cl)) return authRejected(v);
         if (!cl.ok()) return fail("签到失败：HTTP " + cl.status + " " + brief(cl.body));
         JSONObject j = obj(cl.body);
         long code = j.optLong("code", 0L);
@@ -127,9 +149,11 @@ public final class TraeApi {
         if (uid.isEmpty()) return fail("账号缺少 userId，请重新导入 JWT");
 
         String body = "{\"require_usage\":true,\"full_data\":true}";
-        Http.Resp r = Http.request("POST", base(v) + P_ENTITLEMENT,
-                buildHeaders(ctx, jwt, uid), body, 12000, 30000);
+        Http.Resp r = postAny(v, P_ENTITLEMENT,
+                buildHeaders(ctx, jwt, uid), body, 30000);
+        if (r == null) return noRoute(v);
         if (r.error != null) return fail("网络不可达：" + r.error);
+        if (isAuthReject(r)) return authRejected(v);
         if (!r.ok()) return fail("积分查询失败：HTTP " + r.status + " " + brief(r.body));
 
         JSONObject j = obj(r.body);
@@ -180,6 +204,87 @@ public final class TraeApi {
 
     public static JSONObject refreshOne(JSONObject acc) {
         return skipped("Trae JWT 由客户端签发，过期后请重新导出并粘贴导入");
+    }
+
+    // ------------------------------------------------------------------ 多网关自适应（v2.1.2）
+
+    /**
+     * 依次尝试候选网关，返回第一个「有该路由」的响应；全部都是网关级 404 时返回 null。
+     *
+     * <p>背景：{@code /trae/api/v2/*} 只挂载在 {@link #CN_BASE}。国际版账号网关
+     * {@link #AI_ACCOUNT_BASE} 只代理 OAuth/账号路由，打 v2 会返回 nginx 的
+     * {@code <html>404 Not Found</html>} 或 {@code 404 Page not found}，与业务 JSON 的
+     * 4xx 完全不同 —— 前者是「这个网关没有这套接口」，应换下一个；后者是真实业务响应，
+     * 必须交给上层解析，不能当成路由缺失。
+     */
+    private static Http.Resp postAny(String variant, String path, Map<String, String> h,
+                                     String body, int readMs) {
+        String[] bs = bases(variant);
+        for (int i = 0; i < bs.length; i++) {
+            Http.Resp r = Http.request("POST", bs[i] + path, h, body, 12000, readMs);
+            if (isRouteMissing(r)) continue;  // 网关没挂这套路由 → 换下一个
+            return r;                          // 非「路由缺失」的响应（含网络错误/401/业务），交给上层
+        }
+        return null;                           // 所有候选网关都没有这套路由 → 未开放
+    }
+
+    /**
+     * 网关级「路由不存在 / 非 API 响应」：
+     * 404 的 nginx HTML / CDN 纯文本 404，或任意状态码下返回 HTML（SPA fallback）。
+     * 业务响应一定以 {@code {} 或 JSON 起头}，HTML 绝不能当业务结果解析。
+     */
+    private static boolean isRouteMissing(Http.Resp r) {
+        if (r == null || r.error != null) return false;
+        String b = (r.body == null ? "" : r.body.trim().toLowerCase());
+        if (b.startsWith("{")) return false;          // 业务 JSON，交上层
+        if (b.isEmpty()) return true;                 // 空体
+        if (b.contains("<html") || b.contains("<!doctype html")) return true;  // HTML 页（含 200 fallback）
+        if (r.status == 404 && (b.contains("404 not found") || b.contains("404 page not found")))
+            return true;                              // CDN 纯文本 404
+        return false;
+    }
+
+    /**
+     * 鉴权被拒：上游在国内网关用「HTTP 200 + code:1001 / not able to authenticate you」
+     * 表达会话失效（不是 401），国际版账号因账号体系不通也常落到这里。必须有可操作诊断，
+     * 否则用户只看到一串英文或莫名其妙的 404。
+     */
+    private static boolean isAuthReject(Http.Resp r) {
+        if (r == null || r.error != null) return false;
+        if (r.status == 401 || r.status == 403) return true;
+        String b = (r.body == null ? "" : r.body.toLowerCase());
+        if (b.contains("not able to authenticate") || b.contains("unauthoriz")
+                || b.contains("invalid token") || b.contains("token expired")) return true;
+        JSONObject j = obj(r.body);
+        long code = j.optLong("code", 0L);
+        return code == 1001 || code == 401 || code == 403;
+    }
+
+    /** 所有候选网关都没有这套路由：如实判「未开放」，不计成功也不计失败。 */
+    private static JSONObject noRoute(String variant) {
+        String head = "ai".equals(variant)
+                ? "Trae 国际版账号网关（grow-normal.trae.ai）未开放 /trae/api/v2 签到 / 积分路由，官方只在该网关提供账号与 OAuth 接口"
+                : "Trae 上游暂未开放该区域的签到 / 积分路由";
+        return disabled(head + "；已如实标记为「未开放」，不做假登录、不虚报成功。"
+                + "请到电脑端 Trae 客户端确认该账号权益，或改用官方客户端签到。");
+    }
+
+    /** 凭据被上游拒绝（含国内/国际账号体系不通）：给出可操作诊断，而不是裸英文报错。 */
+    private static JSONObject authRejected(String variant) {
+        String head = "ai".equals(variant)
+                ? "Trae 国际版账号的 JWT 未被积分网关接受：国内 / 国际是两套独立账号体系，JWT 不通用；上游目前只对国内网关开放签到 / 积分"
+                : "Trae JWT 已失效或不被接受（会话过期 / 账号不匹配）";
+        return fail(head + "。请在电脑端重新导出该账号最新的 Cloud-IDE-JWT 后重新导入；"
+                + "若反复出现，说明该账号所在区域暂不支持手机端签到 / 查积分。");
+    }
+
+    /** 第三档「未开放」：既非成功也非失败，单独计数（对齐 QoderApi）。 */
+    private static JSONObject disabled(String m) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("ok", false).put("disabled", true).put("message", m).put("detail", m);
+        } catch (Exception ignored) { }
+        return o;
     }
 
     // ------------------------------------------------------------------ 请求头

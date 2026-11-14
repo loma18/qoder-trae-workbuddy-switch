@@ -1,4 +1,4 @@
-# 故障排查（v2.1 · WorkBuddy / Qoder / Trae 三平台独立版）
+# 故障排查（v2.1.2 · WorkBuddy / Qoder / Trae 三平台独立版）
 
 > 先看「设置 → 运行日志」。App 不打印 token 明文，但会记录每次登录、签到、同步的结论。
 > 账号页顶部可按 **全部 / WB / Qoder / Trae** 筛选，排查时先确认账号的平台与区域标签是否正确。
@@ -55,11 +55,22 @@ Qoder 的 `machine_id`、PKCE verifier、nonce 全部在手机本地生成，`lo
 | 添加账号时看不到「发起登录」 | **正常且是预期行为**。Trae 上游授权 URL 需要桌面客户端 `storage.json` 解密出的设备私钥，且授权页会探测 `127.0.0.1:17388`，手机无法满足。App 只提供「粘贴 Trae JWT」。 |
 | 「JWT 格式不正确」 | 应为 `xxxxx.yyyyy.zzzzz` 三段。可带 `Cloud-IDE-JWT ` 或 `Bearer ` 前缀，App 会自动剥掉。 |
 | 「JWT 中找不到用户 ID」 | payload 里没有 `data.id` / `auth_id` / `sub` / `user_id`。后续接口强依赖 userId 派生设备头，请重新导出完整 JWT。 |
-| 「签到失败：HTTP 401/403」 | JWT 已过期或被上游拒绝。Trae JWT 由客户端签发，**App 不做手机端刷新**，需从桌面客户端重新导出并粘贴。 |
+| 「签到失败：HTTP 401/403」或「JWT 已失效或不被接受」 | JWT 已过期或被上游拒绝（`code:1001` / `not able to authenticate you`）。Trae JWT 由客户端签发，**App 不做手机端刷新**，需从桌面客户端重新导出并粘贴。 |
 | 查积分提示「缺少 user_entitlement_pack_list」 | 响应结构变了或账号无权益包；先看运行日志里的 HTTP 状态，再对照 [API-CONTRACT.md](API-CONTRACT.md) 第三节。 |
 | 同一账号偶尔签到被限流 | App 按 uid 稳定派生并持久化 `x-device-id` / `x-market-user-id` / `vscode-sessionid`，正常不会变。若曾清过 App 数据，设备头会重新生成，上游可能短暂关联风控，稍后重试。 |
 
 > 首次从桌面客户端导出一次 JWT 后，签到 / 领积分 / 查余额都在手机上完成，此后**不再依赖电脑**。
+
+### 3b. Trae 国际版「签到 / 查积分都是 404」（v2.1.2 修复）
+
+| 现象 | 原因 / 处理 |
+|:--|:--|
+| **v2.1.1 及更早：国际版签到、查积分都报 `HTTP 404`** | **这是 Bug，已修复**。旧版把「国际版账号网关」`grow-normal.trae.ai` 误当成「签到 / 积分 API 网关」，但 `/trae/api/v2/ug/*`、`/trae/api/v2/pay/*` 只挂载在**国内官方网关 `api.trae.cn`**；国际网关只代理 OAuth / 账号路由（`/trae/api/v3/oauth/*`），打 v2 一律 nginx 404。升级到 **v2.1.2** 后主通道统一为 `api.trae.cn`（与档位无关），并自动跳过网关级 404。 |
+| 升级后显示「**未开放**」 | 如实结果：上游在该网关没有这套路由。不计成功也不计失败。请到电脑端 Trae 客户端确认该国际版账号的权益；App 不伪造登录、不虚报成功。 |
+| 升级后显示「JWT 未被接受 / 国内·国际账号体系独立」 | 上游在 `api.trae.cn` 用 **HTTP 200 + `code:1001`** 拒绝了国际版 JWT（`region.rs` 明确两套账号体系 JWT 不通用）。这是真实上游响应，不是 404。请确认粘贴的是该账号自己的 `Cloud-IDE-JWT` 且未过期；若反复出现，说明该区域暂不支持手机端签到 / 查积分，以电脑端客户端为准。 |
+| 以前报「HTTP 404」现在变成一段长诊断 | v2.1.2 起单个「查积分」的失败 / 未开放结果会打开**报告页**完整展示，不再被 toast 截断成「查询失败」。 |
+| `www.trae.ai` 返回 200，是不是能用？ | 不能。那是 `text/html` 的 **SPA 首页 fallback**（CDN 对未知路径回首页），不是 JSON API。App 只认业务 JSON 响应。 |
+| 为什么参考实现没这问题 | Rust core `credits.rs::post_json` 固定 `TraeVariant::default()`，`mod.rs::endpoints_for` 只返回 `cn_endpoints` —— 它给国际版账号签到也是发往 `api.trae.cn`，`grow-normal.trae.ai` 从未进入真实签到 / 积分请求。v2.1.2 与之对齐。 |
 
 ## 4. 签到 / 领积分（通用）
 
@@ -114,12 +125,13 @@ Qoder 的 `machine_id`、PKCE verifier、nonce 全部在手机本地生成，`lo
 | 构建时提示「versionCode 必须依次递增」 | 已有 `dist/agent.apk` 时，`build.sh` 要求新 `versionCode` 严格大于旧值。发新版本请改 `AndroidManifest.xml` 的 `versionCode`（+1）与 `versionName`。 |
 | 同一版本只改了 SPA/资源想重建 | 用 `ALLOW_REBUILD=1 ./build.sh`，跳过版本递增检查（签名仍不变，可覆盖）。 |
 | 明确要换签名（会要求用户卸载） | `RESET_FINGERPRINT=1 ./build.sh`，仅在你确定放弃覆盖升级时使用。 |
-| v1.x 老版本升级 v2.x | v1.x 私钥已丢失，需卸载一次；**v2.0.0(3) → v2.0.1(4) → v2.1.0(5) → v2.1.1(6) 之间可直接覆盖安装**。 |
-| 升级后 Qoder 仍提示「跳过」 | 确认「设置 → 版本」是 **2.1.1**；旧版缓存可能残留，重进账号页再点签到。 |
+| v1.x 老版本升级 v2.x | v1.x 私钥已丢失，需卸载一次；**v2.0.0(3) → v2.0.1(4) → v2.1.0(5) → v2.1.1(6) → v2.1.2(7) 之间可直接覆盖安装**。 |
+| 升级后 Qoder 仍提示「跳过」 | 确认「设置 → 版本」≥ **2.1.1**；旧版缓存可能残留，重进账号页再点签到。 |
+| 升级后 Trae 国际版仍报 404 | 确认「设置 → 版本」是 **2.1.2**；旧版只打到 `grow-normal.trae.ai`。仍出现请看 3b 节。 |
 
 ## 9. 演示模式与预览
 
-- 「设置 → 演示模式」用内置假数据浏览全部界面（含 WB / Qoder / Trae 四个演示账号），**不发起任何网络请求**。
+- 「设置 → 演示模式」用内置假数据浏览全部界面（含 WB / Qoder / Trae 五个演示账号，新增 Trae 国际版演示「未开放」状态），**不发起任何网络请求**。
 - 用浏览器直接打开 `assets/index.html` 时会自动进入演示模式（没有原生桥），方便预览界面。
 - 关闭演示模式会重新读取本机真实账号库。
 

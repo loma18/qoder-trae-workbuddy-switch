@@ -1,4 +1,4 @@
-# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.1.1 三平台）
+# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.1.2 三平台）
 
 ## 一段需要纠正的判断
 
@@ -99,6 +99,39 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
 > 教训与第一节同源：把「某个端点还在」当成「机制没变」，同样会得出错误结论。
 > 官方把签到从固定端点迁到**活动列表驱动**后，客户端必须跟着读列表，不能继续打老路径。
 
+## v2.1.2 修正：Trae 国际版签到 / 查积分 404
+
+用户反馈「trae 国际版签到和查积分都是 404」。核对 dev 分支 Rust core + 线上匿名探测后，
+这是**移植时把两类网关混为一谈**，不是上游临时故障：
+
+- v2.1 给 Trae 国际版设了 `base = https://grow-normal.trae.ai`，并把
+  `/trae/api/v2/ug/checkin_credits/*`、`/trae/api/v2/pay/ide_user_ent_usage` 拼上去。
+- 但实测：`/trae/api/v2/*` **只挂载在国内官方网关 `https://api.trae.cn`**（匿名 POST 返回
+  `code:1001` 业务 JSON）；`grow-normal.trae.ai` / `api.trae.ai` / `icube-normal.trae.ai` /
+  `core-normal.trae.ai` 上全为 nginx HTML 404；`www.trae.ai` 的 200 是 `text/html`
+  SPA 首页 fallback。`grow-normal.trae.ai` 其实是**国际版账号 / OAuth 网关**——
+  只有 `/trae/api/v3/oauth/ExchangeToken`、`/cloudide/api/v3/...` 返回 400 业务错误。
+- 更关键：参考实现 `credits.rs::post_json` → `post_json_for(TraeVariant::default())`，
+  而 `mod.rs::endpoints_for` **只返回 `cn_endpoints`**；`global_endpoints`
+  （`grow-normal.trae.ai`）只活在端点表和测试里，**从未进入真实签到 / 积分 HTTP 请求**。
+  `model_list_upstream.rs` 亦明确「国际版没有实测证据能走同一个路径…**不猜一个域名**
+  （猜错就是把账号 JWT 发给一个陌生主机）」。v2.1 恰恰越过了这条边界。
+
+修正做法：
+
+1. **网关单一来源**：签到 / 积分主通道恒为 `api.trae.cn`，与 `variant` 无关；
+   国际账号网关仅作回落候选。`variant` 只影响账号标签、诊断文案与回落顺序。
+2. **多网关自适应 `postAny`**：区分「网关级路由不存在」（404 + HTML / `404 Page not found`
+   / 空体）与「业务 JSON 4xx」。前者换下一个网关，后者交上层解析。
+3. **三档语义复用**：全部候选无路由 → `disabled`「未开放」；鉴权被拒 → 可操作诊断；
+   成功 / 今日已签 → 正常。特别注意上游用 **HTTP 200 + `code:1001`
+   `not able to authenticate you`** 表达鉴权失败，不能只看状态码。
+4. **单体积分查询也走报告页**：`disabled` / 失败的长诊断不再被 toast 截断成「查询失败」。
+
+> **国际版账号的现实边界**：`region.rs` 明确 CN 与国际是两套互不相通的账号体系、JWT 不通用。
+> 国际版 JWT 打国内网关可能被拒，App 如实显示「未开放 / 鉴权被拒」，
+> 不伪造成功、不把莫名 404 抛给用户。若确属国际版账号，以电脑端 Trae 客户端为准。
+
 ## 参考实现 → 本 App 的映射
 
 | 参考实现 | 本 App |
@@ -121,6 +154,8 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
 | `qoder/api.rs`（legacy check-in / quota） | `QoderApi.checkinViaLegacy/creditsOne` |
 | `trae/jwt.rs::normalize` · `trae/credits.rs::build_headers` | `TraeApi.addManual` / `buildHeaders` |
 | `trae/checkin.rs` · `trae/credits.rs::parse_credit_packages` | `TraeApi.checkinOne/creditsOne` |
+| `trae/variant.rs::GLOBAL_ENDPOINTS` · `mod.rs::endpoints_for`（只返回 `cn_endpoints`） | `TraeApi.bases`（主通道恒 `api.trae.cn`，国际网关仅回落）（v2.1.2） |
+| `trae/credits.rs::post_json_for` 的网关 404 / `code:1001` 分类 | `TraeApi.postAny/isRouteMissing/isAuthReject`（v2.1.2） |
 | （新）三平台能力矩阵与分派 | `Platforms.java` · `PlatformRouter.java` |
 
 ## 仍然存在的边界
@@ -134,6 +169,9 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
   Qoder / Trae 凭据模型不同，不接入 lansync。
 - **Trae 不能独立扫码 OAuth**：上游要求桌面客户端设备私钥与 `127.0.0.1:17388` 回环探测。
   App 提供「粘贴 JWT 导入」，导入后签到/查积分完全独立；JWT 过期需从桌面客户端重新导出一次。
+- **Trae 国际版账号的签到 / 积分不保证可用**：上游只在 `api.trae.cn` 提供 v2 路由，
+  而国内 / 国际是两套账号体系。v2.1.2 起统一走该网关并如实返回「未开放 / 鉴权被拒」，
+  不猜测国际版专属域名（会把账号 JWT 发给陌生主机）。
 - **Qoder / Trae 不做手机端凭据刷新**：上游没有对应的移动端刷新端点，App 返回跳过提示，
   过期后重新扫码 / 重新导出。
 - **Qoder 活动平台依赖上游活动列表**：账号没有积分类活动、活动限时、或国际版要求官方原生

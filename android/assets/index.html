@@ -283,7 +283,7 @@ textarea{resize:vertical;line-height:1.5}
       </div>
       <div class="card">
         <div class="sec-t">关于</div>
-        <div class="kv"><span>版本</span><b id="verText">2.1.1</b></div>
+        <div class="kv"><span>版本</span><b id="verText">2.1.2</b></div>
         <div class="kv"><span>运行形态</span><b>三平台独立客户端（本机账号库）</b></div>
         <div class="kv"><span>上游协议</span><b>fewards / workbuddy-console / switch core</b></div>
         <div class="kv"><span>凭据存储</span><b>App 私有 SharedPreferences</b></div>
@@ -381,7 +381,7 @@ var S = { cfg:{}, accounts:[], stats:{}, credits:{}, tab:'home', oauth:null, pol
 var PLATFORMS=[
   {id:'wb',label:'WorkBuddy',qr:true,growth:true,note:'手机独立扫码授权（fewards 协议）'},
   {id:'qoder',label:'Qoder',qr:true,growth:false,note:'PKCE 设备授权纯 HTTP 轮询；签到走官方活动平台领取 100 Credits（PAT 不可用，请扫码登录）'},
-  {id:'trae',label:'Trae',qr:false,growth:false,note:'上游需桌面客户端设备私钥与本地回环；粘贴 JWT 导入后即可独立签到 / 查积分'}
+  {id:'trae',label:'Trae',qr:false,growth:false,note:'上游需桌面客户端设备私钥与本地回环；粘贴 JWT 导入后独立签到 / 查积分（签到 / 积分走官方 api.trae.cn 网关，国际版账号可能因账号体系不通被上游拒绝）'}
 ];
 function platformMeta(p){ for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].id===p) return PLATFORMS[i]; return PLATFORMS[0]; }
 function platformOf(a){ return (a && a.platform) || 'wb'; }
@@ -435,6 +435,11 @@ var DEMO = {
      platform:'trae',platformLabel:'Trae',scopeLabel:'Trae · 国内版',
      tokenMask:'eyJ0eXAi…TrAe',hasRefresh:false,
      expiresAt:Math.floor(Date.now()/1000)+86400, refreshExpiresAt:0,
+     obtainedAt:Date.now()-5400000,enterpriseId:'',avatarUrl:'',syncVersion:0},
+    {id:'trae_ai_40005',label:'Trae 演示账号 · 国际版',uid:'40005',variant:'ai',variantLabel:'国际版',
+     platform:'trae',platformLabel:'Trae',scopeLabel:'Trae · 国际版',
+     tokenMask:'eyJ0eXAi…GlObAl',hasRefresh:false,
+     expiresAt:Math.floor(Date.now()/1000)+86400, refreshExpiresAt:0,
      obtainedAt:Date.now()-5400000,enterpriseId:'',avatarUrl:'',syncVersion:0}
   ],
   poll:0, log:'',
@@ -445,7 +450,7 @@ function demoAccounts(){ return DEMO.accounts.map(function(a){
   var o={}; for(var k in a) o[k]=a[k]; return o; }); }
 function demo(action,a){
   var P=function(o){ return o; };
-  if(action==='state') return {ok:true,version:'2.1.1',sdk:34,demo:DEMO.demo,
+  if(action==='state') return {ok:true,version:'2.1.2',sdk:34,demo:DEMO.demo,
     autoCheckin:DEMO.autoCheckin,intervalMin:DEMO.intervalMin,notify:DEMO.notify,
     sync:DEMO.sync,accounts:demoAccounts(),
     stats:{total:DEMO.accounts.length,
@@ -513,14 +518,16 @@ function demo(action,a){
     if(action==='checkin'||action==='growth'){
       var pick=(a&&a.ids&&a.ids.length)?DEMO.accounts.filter(function(x){return a.ids.indexOf(x.id)>=0}):DEMO.accounts;
       var items=pick.map(function(x){
-        var pf=platformOf(x), skip=false, detail='', parts=null;
+        var pf=platformOf(x), skip=false, detail='', parts=null, disabled=false;
         if(action==='checkin'){
           skip=(pf==='wb' && x.variant==='ai');
-          detail=skip?'WorkBuddy 国际版暂无签到接口，已跳过'
+          disabled=(pf==='trae' && x.variant==='ai');
+          detail=disabled?'Trae 国际版账号网关未开放 /trae/api/v2 签到路由，已如实标记「未开放」'
+            :skip?'WorkBuddy 国际版暂无签到接口，已跳过'
             :(pf==='qoder'?'活动领取成功 +100 Credits（1 项）'
             :(pf==='trae'?'Trae 签到领积分完成，+150 Credits':'领取成功 +10 积分，连签 7 天'));
           if(pf==='qoder') parts=['领取成功 +100 Credits · 每日领取 100 Credits','下次可领 10:00（UTC+8）'];
-          var r={ok:true,already:false,skipped:skip,detail:detail,parts:parts};
+          var r={ok:!disabled,already:false,skipped:skip,disabled:disabled,detail:detail,parts:parts};
         } else {
         skip=(pf!=='wb' || x.variant==='ai');
         detail=skip?(pf==='wb'?'国际版暂无成长中心，已跳过':'该平台没有成长中心，签到即领积分')
@@ -540,10 +547,16 @@ function demo(action,a){
                  expireAt:Date.now()+12*86400000},
                 {name:'体验包',code:'TRIAL',total:1000,remaining:1000,used:0,expireAt:0}],
       expireAt:Date.now()+12*86400000,variant:'cn'};
+    var blocked={ok:false,disabled:true,
+      message:'Trae 国际版账号网关未开放 /trae/api/v2 积分路由，请到电脑端 Trae 客户端确认该账号权益',
+      detail:'Trae 国际版账号网关（grow-normal.trae.ai）未开放 /trae/api/v2 签到 / 积分路由，已如实标记「未开放」'};
+    var resultFor=function(x){
+      return (platformOf(x)==='trae'&&x.variant==='ai')?blocked:cr; };
     if(action==='creditsAll') return {ok:true,okCount:DEMO.accounts.length,failCount:0,
       items:DEMO.accounts.map(function(x){return {id:x.id,label:x.label,
-        platform:platformOf(x),platformLabel:x.platformLabel||'WorkBuddy',result:cr};})};
-    return cr;
+        platform:platformOf(x),platformLabel:x.platformLabel||'WorkBuddy',result:resultFor(x)};})};
+    var one=DEMO.accounts.filter(function(x){return x.id===(a&&a.id);})[0];
+    return one?resultFor(one):cr;
   }
   if(action==='refresh') return {ok:true,message:'凭据已刷新（演示）'};
   if(action==='syncPing') return {ok:true,paired:true,message:'电脑端在线（演示）'};
@@ -625,7 +638,7 @@ function render(){
   $('#sCredits').textContent=sum==null?'—':Math.round(sum);
   $('#hdBadge').className='badge'+(S.cfg.demo?' demo':'');
   $('#hdBadge').textContent=S.cfg.demo?'演示模式':'本机独立运行';
-  $('#verText').textContent='2.1.1'+(BROWSER?' · 浏览器预览':'');
+  $('#verText').textContent='2.1.2'+(BROWSER?' · 浏览器预览':'');
   $('#swAuto').checked=!!S.cfg.autoCheckin;
   $('#swNotify').checked=!!S.cfg.notify;
   $('#swDemo').checked=!!S.cfg.demo;
@@ -764,7 +777,7 @@ function sheet(kind){
       '<button id="segAi" class="'+(v==='ai'?'on':'')+'" onclick="App.setVariant(\'ai\')">国际版</button></div>'+
       '<div class="hint" style="margin-top:0">'+esc(meta.note)+
       (v==='ai' && pf==='wb' ? '<br><span style="color:var(--warn)">WorkBuddy 国际版暂无签到 / 成长中心接口，可登录与查积分，签到会自动跳过。</span>' : '')+
-      (pf==='trae' ? '<br><span style="color:var(--warn)">Trae 的签到 / 积分接口只需 JWT + 自造设备头：导入后可长期独立签到、领积分、查余额。</span>' : '')+
+      (pf==='trae' ? '<br><span style="color:var(--warn)">Trae 的签到 / 积分接口只需 JWT + 自造设备头，走官方 api.trae.cn 网关。</span>'+(v==='ai'?'<br><span style="color:var(--warn)">国际版账号与国内是两套账号体系：上游未在国际网关开放该路由，签到 / 查积分可能返回「未开放」或鉴权提示，请以电脑端 Trae 客户端为准。</span>':'') : '')+
       (pf==='qoder' ? '<br><span style="color:var(--warn)">签到请用「发起登录」扫码取得 access token；PAT 只能查额度，不能用于活动平台签到。</span>' : '')+
       '</div><div class="line"></div>'+
       (meta.qr
@@ -971,8 +984,11 @@ var App={
   credits:function(id){
     toast('查询积分…');
     native('credits',{id:id}).then(function(r){
-      if(r&&r.ok){ S.credits[id]=r; render(); toast('积分已更新'); }
-      else toast((r&&(r.error||'查询失败'))||'查询失败',true);
+      if(r&&r.ok){ S.credits[id]=r; render(); toast('积分已更新'); return; }
+      // 未开放 / 鉴权诊断文案较长，走报告页完整展示，别被 toast 截断或吞成「查询失败」。
+      var acc=(S.accounts||[]).filter(function(a){return a.id===id;})[0];
+      S.lastReport={at:Date.now(),items:[{id:id,label:acc?acc.label:id,result:r||{ok:false,error:'查询失败'}}]};
+      renderHomeResult(); sheet('report');
     });
   },
   refresh:function(id){

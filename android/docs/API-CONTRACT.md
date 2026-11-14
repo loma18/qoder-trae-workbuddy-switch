@@ -1,4 +1,4 @@
-# 官方 API 契约（v2.1 · WorkBuddy / Qoder / Trae 三平台独立版）
+# 官方 API 契约（v2.1.2 · WorkBuddy / Qoder / Trae 三平台独立版）
 
 > 本 App 的 Java 层逐条实现以下端点，全部由手机直连官方域名，**不经过电脑**。
 > - WorkBuddy：来自 [fewards](https://github.com/loma18/fewards) `core/workbuddy/*` / `core/lansync/*`，
@@ -19,7 +19,11 @@
 | Qoder 国内版 `qoder/cn` | ✅ PKCE 设备授权 | ✅ 签到即领积分 | ❌ | ✅ 额度 | ✅ | 不需要 |
 | Qoder 国际版 `qoder/ai` | ✅ | ✅ | ❌ | ✅ | ✅ | 不需要 |
 | Trae 国内版 `trae/cn` | ❌ 上游限制 | ✅ 粘贴 JWT 后 | ❌ | ✅ | ✅（JWT 导入后） | 仅首次导出 JWT |
-| Trae 国际版 `trae/ai` | ❌ | ✅ | ❌ | ✅ | ✅（JWT 导入后） | 仅首次导出 JWT |
+| Trae 国际版 `trae/ai` | ❌ | ⚠️ 见 §三·4.1 | ❌ | ⚠️ 见 §三·4.1 | ✅（JWT 导入后） | 仅首次导出 JWT |
+
+> **Trae 国际版（v2.1.2 修正）**：签到 / 积分请求统一发往 `api.trae.cn`（与国内版同网关），
+> 但国内 / 国际是两套账号体系，上游可能拒绝国际版 JWT。此时按三档语义如实返回
+> 「未开放」或「鉴权被拒」诊断，不虚报成功。详见 [三、Trae](#三traetraeapijava) 的 4.1 节。
 
 分派规则：`PlatformRouter.checkinOne/creditsOne/growthOne/refreshOne` 按账号的 `platform` 字段
 路由到 `WorkBuddyApi` / `QoderApi` / `TraeApi`。历史账号无 `platform` 字段时 `Platforms.of()`
@@ -373,9 +377,28 @@ cosy-version: 0.4.3
 
 ## 2. JWT 导入（`addManual`）
 
-| | 国内版 `cn` | 国际版 `ai` |
+### 网关单一来源（★ v2.1.2 修正，勿回退）
+
+`/trae/api/v2/*` 这套签到 / 积分路由**只挂载在国内官方网关 `https://api.trae.cn`**，
+与「国内版 / 国际版」选择无关。国际版 `https://grow-normal.trae.ai` 是**账号 / OAuth 网关**，
+只代理 `/trae/api/v3/oauth/*`、`/cloudide/api/v3/*`；打 v2 一律返回 nginx 404。
+
+| 网关 | 角色 | `/trae/api/v2/ug/*`、`/trae/api/v2/pay/*` |
 |:--|:--|:--|
-| `base` | `https://api.trae.cn` | `https://grow-normal.trae.ai` |
+| `https://api.trae.cn` | **签到 / 积分 API 网关（主通道，恒用）** | ✅ 挂载（返回业务 JSON） |
+| `https://grow-normal.trae.ai` | 国际版账号 / OAuth 网关（仅回落候选） | ❌ nginx 404（路由不存在） |
+
+> 依据：`credits.rs::post_json` → `post_json_for(TraeVariant::default())` 固定取
+> `endpoints_for(..).account_base`；`mod.rs::endpoints_for` 只返回 `cn_endpoints`，
+> `global_endpoints`（`grow-normal.trae.ai`）从未进入真实签到 / 积分请求。
+> `model_list_upstream.rs` 亦明确「国际版没有实测证据能走同一个路径…不猜一个域名」。
+> 实测（匿名 POST）：`api.trae.cn` 返回 `code:1001` 业务 JSON；`grow-normal.trae.ai`
+> / `api.trae.ai` / `icube-normal.trae.ai` / `core-normal.trae.ai` 全为 nginx HTML 404；
+> `www.trae.ai` 的 200 是 `text/html` SPA 首页 fallback，不是 API。
+
+因此 `bases(variant)`：**主通道恒为 `api.trae.cn`**；`ai` 档额外挂账号网关作回落候选。
+`variant` 只用于账号标签、诊断文案与回落顺序，**不决定主 API 网关**。
+`domain` 字段记录主通道 `api.trae.cn`。
 
 - `normalize()` 剥掉 `Cloud-IDE-JWT ` / `Bearer ` 前缀与首尾空白。
 - 解 JWT payload（Base64URL → 补 `=` → decode）：`data.id` → `auth_id` → `sub` → `user_id` → `uid` 取 userId；
@@ -414,14 +437,33 @@ sec-fetch-site: none
 
 ## 4. 签到领积分
 
-| 动作 | 端点 | 要点 |
+| 动作 | 端点（{base} = `api.trae.cn` 主通道） | 要点 |
 |:--|:--|:--|
 | 查状态 | `POST {base}/trae/api/v2/ug/checkin_credits/status`，body `{}` | `checked_in` / `checkedIn` = 今日已签 |
 | 领取 | `POST {base}/trae/api/v2/ug/checkin_credits/claim`，body `{}` | `code != 0` 且 `message` 非 `success`/空 → 失败；含「已签」/`already` 视为今日已签 |
 
+### 4.1 多网关自适应与三档语义（`postAny`，v2.1.2）
+
+`postAny(variant, path, headers, body, readMs)` 依次尝试 `bases(variant)`：
+
+1. **网关级「路由不存在」判定**：`HTTP 404` 且响应体是 nginx HTML / `404 Page not found` /
+   空体（非 `{…}` JSON）→ 该网关没挂这套路由，`continue` 换下一个。
+   业务 JSON 的 4xx **不算**路由缺失，必须交上层解析。
+2. 全部候选都没有路由 → `noRoute()` 返回 `{ok:false, disabled:true, message, detail}`，
+   前端显示「**未开放**」，既不计成功也不计失败。
+3. 拿到业务响应后先过 `isAuthReject()`：`HTTP 401/403`、`code:1001/401/403`、
+   或 `not able to authenticate you` / `unauthorized` / `invalid token` 等文本
+   → `authRejected()` 给出可操作诊断（上游在国内网关用 **HTTP 200 + code:1001** 表达鉴权失败，
+   不是 401，所以不能只看状态码）。
+4. 其余按业务码正常解析成功 / 今日已签 / 失败。
+
+> **红线**：国际版账号与国内是两套账号体系（`region.rs`：「JWT 不通用」）。
+> 国际版 JWT 打国内网关被拒时**绝不伪装成成功**，也不把网关 404 直接抛给用户。
+
 ## 5. 积分查询
 
-`POST {base}/trae/api/v2/pay/ide_user_ent_usage`，body `{"require_usage":true,"full_data":true}`。
+`POST {base}/trae/api/v2/pay/ide_user_ent_usage`，body `{"require_usage":true,"full_data":true}`，
+同样经 `postAny` 多网关自适应 + `isAuthReject` 诊断。
 
 响应 `user_entitlement_pack_list[]`（也可能包在 `data` 下），逐包取
 `entitlement_base_info.quota.credits_limit` 减 `usage.credits_amount` 得剩余；
@@ -494,7 +536,7 @@ v2.0 字段与 fewards `AccountRepository.WorkBuddyAccount` 一一对应；**v2.
 | `refreshExpiresAt` | **秒** | refresh 到期；`0 = 未知` |
 | `obtainedAt` | **毫秒** | 拿到这份凭据的时刻，用于比新旧 |
 | `syncVersion` | — | 电脑端维护的单调版本 |
-| `domain` | — | Trae 记录所属 base，防止跨档请求 |
+| `domain` | — | Trae 记录签到 / 积分主通道 `api.trae.cn`（v2.1.2 起不再按档位切换） |
 
 `makeFor(platform, uid, label, token, variant)` 生成 id 前缀按平台 + 档位隔离：
 WorkBuddy 国内 `wb_` / 国际 `wb_ai_`，Qoder / Trae 为 `{platform}_{variant}_`。
@@ -512,14 +554,18 @@ JWT 解 profile：`nickname`（trim 控制字符）优先，否则 `preferred_us
 |:--|:--|:--|:--|
 | 扫码登录 | ✅ 官方 `/v2/plugin/auth/*` | ✅ PKCE + `deviceToken/poll` | ❌ 上游需设备私钥 + 本地回环 |
 | 手动导入 | ✅ 凭据 JSON | ✅ access token（PAT 不能签到） | ✅ `Cloud-IDE-JWT …` |
-| 独立签到 | ✅ 国内版 | ✅ 活动平台 campaigns（v2.1.1） | ✅ |
-| 独立查积分 | ✅ | ✅ 额度 | ✅ 权益包 |
+| 独立签到 | ✅ 国内版 | ✅ 活动平台 campaigns（v2.1.1） | ✅ 国内版；国际版走 `api.trae.cn` 主通道，被上游拒绝则「未开放 / 鉴权诊断」（v2.1.2） |
+| 独立查积分 | ✅ | ✅ 额度 | ✅ 权益包（同上，国际版可能被上游拒绝） |
 | 自动签到（`AlarmManager`） | ✅ | ✅ | ✅ |
 | 手机端刷新凭据 | ✅ 轮换式 | ❌ 重新扫码 | ❌ 重新导出 |
 | 同步到电脑 | ✅ 可选 | — | — |
 
 三者的「一键签到」都经 `PlatformRouter` 汇总。**结果分三档**：
 - 不支持的档位（WorkBuddy 国际版、Qoder/Trae 的成长中心）返回 `skipped=true`，显示「跳过」；
-- Qoder 活动列表没有积分类活动时返回 `ok:false + disabled=true`，显示「**未开放**」——
+- 上游确实没有可领取内容 / 路由时返回 `ok:false + disabled=true`，显示「**未开放**」——
+  Qoder 活动列表无积分类活动、Trae 国际版 `api.trae.cn` 也无 v2 路由时都归此档。
   `JsBridge` 单独计 `disabledCount`，不计入成功、也不计入失败，**绝不谎报「N 个成功」**；
 - 真领取成功 / 今日已领返回 `ok:true`，并显示逐条活动明细与 `+N Credits`。
+
+> 单个「查积分」也支持 `disabled`：v2.1.2 起 `App.credits` 对非成功结果打开报告页完整展示诊断，
+> 不再被 toast 截断成一句「查询失败」。
