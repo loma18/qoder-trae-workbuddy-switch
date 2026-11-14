@@ -3,917 +3,1039 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<title>Buddy Switch Agent</title>
+<title>Buddy Switch · 手机独立版</title>
 <style>
 :root{
-  --bg:#0b1220; --bg2:#111c30; --card:#16233b; --card2:#1c2c48;
-  --line:rgba(148,163,184,.14); --txt:#e8eefb; --sub:#93a4c3; --dim:#64769a;
-  --pri:#6366f1; --pri2:#818cf8; --ok:#34d399; --warn:#fbbf24; --err:#fb7185;
-  --cy:#38bdf8; --pu:#a78bfa; --grad:linear-gradient(135deg,#6366f1,#8b5cf6 55%,#ec4899);
-  --sh:0 8px 28px rgba(0,0,0,.28);
+  --bg:#0a0f1c; --bg2:#0f1729; --card:#151f36; --card2:#1b2742;
+  --line:#26334f; --txt:#eaf0ff; --sub:#8b9bbd; --dim:#5f6f92;
+  --pri:#5b8cff; --pri2:#7c6cff; --ok:#38d39f; --warn:#ffb454; --err:#ff6b7a;
+  --grad:linear-gradient(135deg,#5b8cff 0%,#7c6cff 55%,#b06cff 100%);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;height:100%;overflow:hidden}
-body{
-  background:var(--bg);color:var(--txt);
-  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
-#app{height:100%;display:flex;flex-direction:column;position:relative}
-/* ---------- 顶栏 ---------- */
-header{
-  flex:none;padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
-  background:linear-gradient(180deg,#131f36,#0d1729);
-  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;z-index:5;
-}
-.logo{width:34px;height:34px;border-radius:10px;background:var(--grad);display:grid;place-items:center;flex:none;box-shadow:0 4px 14px rgba(99,102,241,.4)}
-.logo svg{width:20px;height:20px}
-.htxt{flex:1;min-width:0}
-.htxt h1{margin:0;font-size:15px;font-weight:700;letter-spacing:.2px}
-.htxt p{margin:2px 0 0;font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block;margin-right:5px}
-.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
-.dot.off{background:var(--err)}
-.iconbtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--sub);display:grid;place-items:center;flex:none;cursor:pointer}
-.iconbtn:active{transform:scale(.93)}
-.iconbtn svg{width:17px;height:17px}
-/* ---------- 内容 ---------- */
-main{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 14px calc(env(safe-area-inset-bottom) + 84px);-webkit-overflow-scrolling:touch}
-.page{display:none;animation:fade .22s ease}
-.page.active{display:block}
-@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-/* ---------- 通用组件 ---------- */
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:var(--sh)}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+body{overflow:hidden}
+#app{position:absolute;inset:0;display:flex;flex-direction:column}
+.hd{flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
+  background:linear-gradient(180deg,#131d34 0%,rgba(15,23,41,0) 100%);
+  border-bottom:1px solid var(--line)}
+.hd-row{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--grad);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;
+  box-shadow:0 4px 14px rgba(91,140,255,.35);flex:0 0 auto}
+.hd h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px}
+.hd .sub{font-size:11px;color:var(--sub);margin-top:1px}
+.badge{margin-left:auto;font-size:10px;padding:4px 9px;border-radius:20px;
+  background:rgba(56,211,159,.12);color:var(--ok);border:1px solid rgba(56,211,159,.3);white-space:nowrap}
+.badge.demo{background:rgba(255,180,84,.12);color:var(--warn);border-color:rgba(255,180,84,.3)}
+.sc{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:14px 14px 24px;
+  -webkit-overflow-scrolling:touch}
+.view{display:none}.view.on{display:block}
+.nv{flex:0 0 auto;display:flex;background:#0d1526;border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom)}
+.nv button{flex:1;background:none;border:0;color:var(--dim);padding:9px 0 10px;
+  font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.nv button.on{color:var(--pri)}
+.nv svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:14px;margin-bottom:12px}
 .card.tight{padding:12px}
-.sec-title{font-size:12px;color:var(--sub);font-weight:600;letter-spacing:.6px;margin:18px 2px 9px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
-.sec-title:first-child{margin-top:2px}
-.sec-title .link{font-size:11px;color:var(--pri2);font-weight:500;text-transform:none;letter-spacing:0}
-.row{display:flex;align-items:center;gap:10px}
-.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.grow{flex:1;min-width:0}
-.muted{color:var(--sub)}
-.dim{color:var(--dim)}
-.tiny{font-size:11px}
-.small{font-size:12px}
-.big{font-size:26px;font-weight:700;letter-spacing:-.5px}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.btn{
-  border:1px solid var(--line);background:var(--card2);color:var(--txt);
-  padding:10px 14px;border-radius:11px;font-size:13px;font-weight:600;cursor:pointer;
-  display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:.15s;
-}
+.sec-t{font-size:12px;color:var(--sub);font-weight:600;margin:2px 0 10px;
+  display:flex;align-items:center;gap:6px}
+.sec-t:before{content:"";width:3px;height:12px;border-radius:2px;background:var(--pri)}
+.sec-t .r{margin-left:auto;font-weight:400;color:var(--dim);font-size:11px}
+.hero{background:linear-gradient(140deg,#1c2c52 0%,#20204a 100%);
+  border:1px solid #2c3c66;border-radius:16px;padding:16px;margin-bottom:12px;
+  position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-40px;top:-55px;width:150px;height:150px;
+  border-radius:50%;background:radial-gradient(circle,rgba(124,108,255,.28),transparent 70%)}
+.hero h2{margin:0 0 4px;font-size:17px;position:relative;z-index:1}
+.hero p{margin:0 0 14px;font-size:11.5px;color:#a9b8dc;position:relative;z-index:1}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.stat{flex:1 1 30%;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:11px 8px;text-align:center}
+.stat b{display:block;font-size:21px;line-height:1.2;background:var(--grad);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{font-size:10px;color:var(--sub)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px 13px;border-radius:10px;border:1px solid var(--line);
+  background:var(--card2);color:var(--txt);font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:.15s;white-space:nowrap}
 .btn:active{transform:scale(.97)}
-.btn.pri{background:var(--grad);border-color:transparent;box-shadow:0 5px 16px rgba(99,102,241,.35)}
-.btn.ok{background:rgba(52,211,153,.13);border-color:rgba(52,211,153,.3);color:var(--ok)}
-.btn.warn{background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.28);color:var(--warn)}
-.btn.err{background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.28);color:var(--err)}
-.btn.ghost{background:transparent}
-.btn.sm{padding:7px 11px;font-size:12px;border-radius:9px}
+.btn.pri{background:var(--grad);border:0;color:#fff;box-shadow:0 4px 14px rgba(91,140,255,.28)}
+.btn.ok{background:rgba(56,211,159,.14);border-color:rgba(56,211,159,.35);color:var(--ok)}
+.btn.dan{background:rgba(255,107,122,.12);border-color:rgba(255,107,122,.3);color:var(--err)}
 .btn.full{width:100%}
+.btn.lg{padding:13px;font-size:14px;border-radius:12px}
+.btn.sm{padding:6px 10px;font-size:11px;border-radius:8px;font-weight:500}
 .btn:disabled{opacity:.45;pointer-events:none}
-.btn svg{width:15px;height:15px}
-.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px}
-.stat .k{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px}
-.stat .v{font-size:22px;font-weight:700;margin-top:6px;letter-spacing:-.4px}
-.stat .d{font-size:10px;color:var(--dim);margin-top:2px}
-.tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;white-space:nowrap}
-.tag.ok{background:rgba(52,211,153,.14);color:var(--ok)}
-.tag.warn{background:rgba(251,191,36,.14);color:var(--warn)}
-.tag.err{background:rgba(251,113,133,.14);color:var(--err)}
-.tag.pri{background:rgba(129,140,248,.16);color:var(--pri2)}
-.tag.gray{background:rgba(148,163,184,.12);color:var(--sub)}
-.bar{height:6px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:9px}
-.bar>i{display:block;height:100%;border-radius:6px;background:var(--grad);transition:width .5s}
-.bar.ok>i{background:linear-gradient(90deg,#34d399,#10b981)}
-.bar.warn>i{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
-.avatar{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:15px;flex:none;color:#fff}
-input,select,textarea{
-  width:100%;background:rgba(255,255,255,.045);border:1px solid var(--line);border-radius:10px;
-  color:var(--txt);padding:10px 12px;font-size:13px;outline:none;font-family:inherit;
-}
-input:focus,select:focus,textarea:focus{border-color:var(--pri);background:rgba(99,102,241,.07)}
-label.fld{display:block;margin-bottom:11px}
-label.fld>span{display:block;font-size:11px;color:var(--sub);margin-bottom:5px;font-weight:600}
-select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393a4c3' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
-.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex:none;padding:7px 13px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--sub);font-size:12px;font-weight:600;cursor:pointer}
-.chip.on{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(99,102,241,.3)}
-.switch{width:44px;height:25px;border-radius:20px;background:rgba(148,163,184,.25);position:relative;cursor:pointer;flex:none;transition:.2s}
-.switch>i{position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.3)}
-.switch.on{background:var(--pri)}
-.switch.on>i{left:22px}
-.line{height:1px;background:var(--line);margin:12px 0}
-.empty{text-align:center;padding:30px 16px;color:var(--dim)}
-.empty svg{width:40px;height:40px;opacity:.4;margin-bottom:10px}
-.item{padding:11px 0;border-bottom:1px solid var(--line)}
-.item:last-child{border-bottom:none}
-.hint{background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.18);border-radius:11px;padding:11px;font-size:11.5px;color:#a5c8e8;line-height:1.65}
-.hint code{background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;color:#c7e2ff;font-size:10.5px;word-break:break-all}
-pre.code{background:#070d18;border:1px solid var(--line);border-radius:10px;padding:11px;overflow-x:auto;font-size:10.5px;color:#a5d6ff;margin:0;line-height:1.6}
-/* ---------- 底栏 ---------- */
-nav{
-  position:absolute;left:0;right:0;bottom:0;z-index:6;
-  display:flex;background:rgba(13,22,39,.96);backdrop-filter:blur(14px);
-  border-top:1px solid var(--line);padding:8px 4px calc(env(safe-area-inset-bottom) + 8px);
-}
-nav button{flex:1;background:none;border:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;cursor:pointer;padding:2px 0}
-nav button svg{width:21px;height:21px}
-nav button.on{color:var(--pri2)}
-nav button.on svg{filter:drop-shadow(0 0 6px rgba(129,140,248,.5))
-}
-/* ---------- 弹层 / toast ---------- */
-.mask{position:absolute;inset:0;background:rgba(4,8,18,.72);backdrop-filter:blur(3px);z-index:20;display:none;align-items:flex-end}
-.mask.show{display:flex}
-.sheet{width:100%;max-height:88%;overflow-y:auto;background:var(--bg2);border-radius:22px 22px 0 0;border-top:1px solid var(--line);padding:8px 16px calc(env(safe-area-inset-bottom) + 20px);animation:up .25s ease}
-@keyframes up{from{transform:translateY(100%)}to{transform:none}}
-.handle{width:38px;height:4px;border-radius:4px;background:var(--dim);margin:6px auto 16px;opacity:.5}
-.sheet h2{margin:0 0 4px;font-size:17px}
-.sheet .desc{color:var(--sub);font-size:12px;margin:0 0 16px}
-#toast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%) translateY(12px);z-index:40;background:#22314d;border:1px solid var(--line);color:var(--txt);padding:10px 16px;border-radius:12px;font-size:12.5px;box-shadow:var(--sh);opacity:0;pointer-events:none;transition:.22s;max-width:86%;text-align:center}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-#toast.err{border-color:rgba(251,113,133,.5);color:#ffd7de}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.acc{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:13px;margin-bottom:10px}
+.acc-h{display:flex;align-items:flex-start;gap:10px}
+.av{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:flex;
+  align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff}
+.acc-n{font-weight:650;font-size:14px;word-break:break-all}
+.acc-m{font-size:10.5px;color:var(--dim);margin-top:2px;word-break:break-all}
+.vtag{font-size:9.5px;padding:2px 7px;border-radius:5px;margin-left:6px;
+  background:rgba(91,140,255,.15);color:#9db9ff;white-space:nowrap;vertical-align:1px}
+.vtag.ai{background:rgba(176,108,255,.15);color:#d3a8ff}
+.cred-box{margin-top:11px;padding:10px;background:#111a2e;border-radius:10px;
+  border:1px solid #202d49}
+.cred-n{display:flex;align-items:baseline;gap:6px}
+.cred-n b{font-size:22px;color:var(--ok);line-height:1}
+.cred-n span{font-size:10.5px;color:var(--sub)}
+.bar{height:5px;border-radius:3px;background:#23304c;margin-top:9px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#38d39f,#5b8cff)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:3px 0}
+.kv span{color:var(--dim);flex:0 0 auto}
+.kv b{font-weight:500;text-align:right;word-break:break-all;color:#c3d0ea}
+.acc-acts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.empty{text-align:center;padding:38px 16px;color:var(--dim)}
+.empty .ic{font-size:34px;opacity:.5;margin-bottom:8px}
+.empty p{margin:0 0 14px;font-size:12.5px}
+label.fld{display:block;margin:10px 0 0}
+label.fld>span{display:block;font-size:11px;color:var(--sub);margin-bottom:5px}
+input,textarea,select{width:100%;background:#0e172a;border:1px solid var(--line);
+  color:var(--txt);border-radius:9px;padding:10px 11px;font-size:13px;
+  font-family:inherit;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--pri)}
+textarea{resize:vertical;line-height:1.5}
+.row2{display:flex;gap:8px}.row2>*{flex:1;min-width:0}
+.hint{font-size:10.5px;color:var(--dim);line-height:1.6;margin-top:8px}
+.hint code{background:#1b2742;padding:1px 4px;border-radius:4px;color:#a9c2ff;font-size:10px}
+.line{height:1px;background:var(--line);margin:14px 0}
+.seg{display:flex;gap:6px;background:#0e172a;border:1px solid var(--line);
+  border-radius:10px;padding:4px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:none;color:var(--sub);padding:8px;
+  border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}
+.seg button.on{background:var(--grad);color:#fff}
+.item{display:flex;gap:9px;align-items:flex-start;padding:9px 0;
+  border-bottom:1px solid rgba(38,51,79,.6);font-size:11.5px}
+.item:last-child{border-bottom:0}
+.dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;margin-top:5px}
+.item .tx{flex:1;min-width:0;word-break:break-word}
+.item .tx small{display:block;color:var(--dim);font-size:10px;margin-top:2px}
+.tag-ok{color:var(--ok)}.tag-err{color:var(--err)}.tag-warn{color:var(--warn)}
+#sheet{position:absolute;inset:0;z-index:30;display:none}
+#sheet.on{display:block}
+#sheet .mask{position:absolute;inset:0;background:rgba(4,8,18,.72);backdrop-filter:blur(3px)}
+#sheet .panel{position:absolute;left:0;right:0;bottom:0;max-height:90%;
+  overflow-y:auto;background:#111a2d;border-top:1px solid var(--line);
+  border-radius:20px 20px 0 0;padding:8px 16px calc(env(safe-area-inset-bottom) + 22px);
+  animation:up .22s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:translateY(0);opacity:1}}
+#sheet .handle{width:36px;height:4px;border-radius:3px;background:#33415f;margin:4px auto 12px}
+#sheet h2{margin:0 0 4px;font-size:16px}
+#sheet .desc{margin:0 0 6px;font-size:11.5px;color:var(--sub)}
+.qr-wrap{display:flex;justify-content:center;margin:14px 0 8px}
+.qr-wrap canvas{background:#fff;border-radius:10px;padding:8px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.qr-state{text-align:center;font-size:11.5px;color:var(--sub);min-height:18px}
+.url-box{margin-top:10px;font-size:10px;color:var(--dim);word-break:break-all;
+  background:#0e172a;border:1px solid var(--line);border-radius:8px;padding:9px;
+  max-height:64px;overflow:auto}
+#toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%) translateY(10px);
+  z-index:50;background:#22314d;border:1px solid var(--line);color:var(--txt);
+  padding:10px 16px;border-radius:10px;font-size:12px;max-width:82%;text-align:center;
+  opacity:0;transition:.22s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.bad{border-color:rgba(255,107,122,.5);color:#ffc4ca}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
-.banner{background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(236,72,153,.1));border:1px solid rgba(129,140,248,.25);border-radius:15px;padding:14px;display:flex;gap:12px;align-items:center}
-.banner .bico{width:42px;height:42px;border-radius:13px;background:var(--grad);display:grid;place-items:center;flex:none}
-.banner .bico svg{width:22px;height:22px}
-.kv{display:flex;justify-content:space-between;font-size:12px;padding:6px 0}
-.kv .k{color:var(--sub)}
+.tiny{font-size:10px;color:var(--dim)}
+.log-box{background:#0a1120;border:1px solid var(--line);border-radius:9px;padding:10px;
+  max-height:180px;overflow:auto;font-size:10px;line-height:1.7;color:#9fb0d0;
+  white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;
+  border-bottom:1px solid rgba(38,51,79,.6)}
+.sw:last-child{border-bottom:0}
+.sw .t{font-size:12.5px}.sw .d{font-size:10.5px;color:var(--dim);margin-top:2px}
+.sw input[type=checkbox]{appearance:none;width:40px;height:23px;border-radius:12px;
+  background:#2a3752;position:relative;flex:0 0 auto;transition:.2s;cursor:pointer;padding:0}
+.sw input[type=checkbox]:checked{background:var(--pri)}
+.sw input[type=checkbox]:after{content:"";position:absolute;top:3px;left:3px;
+  width:17px;height:17px;border-radius:50%;background:#fff;transition:.2s}
+.sw input[type=checkbox]:checked:after{left:20px}
 </style>
 </head>
 <body>
 <div id="app">
-  <header>
-    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></div>
-    <div class="htxt"><h1>Buddy Switch</h1><p id="connLine"><span class="dot"></span>正在初始化…</p></div>
-    <button class="iconbtn" onclick="App.refresh()" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
-  </header>
+  <div class="hd">
+    <div class="hd-row">
+      <div class="logo">B</div>
+      <div><h1>Buddy Switch</h1><div class="sub">手机独立登录 · 签到领积分</div></div>
+      <div id="hdBadge" class="badge">本机独立运行</div>
+    </div>
+  </div>
 
-  <main id="main">
-    <!-- 概览 -->
-    <section class="page active" id="p-overview">
-      <div class="banner" style="margin-bottom:12px">
-        <div class="bico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
-        <div class="grow"><div style="font-weight:700;font-size:14px" id="ovTitle">多账号工作台</div><div class="tiny muted" id="ovSub">WorkBuddy · Trae · Qoder · 6 个作用域</div></div>
-        <span class="tag pri" id="ovMode">演示</span>
+  <div class="sc" id="sc">
+    <!-- ============ 首页 ============ -->
+    <div class="view on" id="v-home">
+      <div class="hero">
+        <h2>今天领了吗？</h2>
+        <p>账号凭据存在这台手机上，签到与领取直连官方接口，不需要电脑。</p>
+        <button class="btn pri full lg" onclick="App.runAll()">一键签到并领取积分</button>
       </div>
-
-      <div class="grid4" id="ovStats"></div>
-
-      <div class="sec-title">待办提醒 <span class="link" onclick="App.go('checkin')">去签到 →</span></div>
-      <div class="card" id="ovTodo"></div>
-
-      <div class="sec-title">快捷操作</div>
-      <div class="grid2">
-        <button class="btn pri" onclick="App.checkinAll()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>一键签到全部</button>
-        <button class="btn" onclick="App.go('credits')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>刷新积分</button>
+      <div class="stats">
+        <div class="stat"><b id="sTotal">0</b><span>本机账号</span></div>
+        <div class="stat"><b id="sWb">0</b><span>WorkBuddy</span></div>
+        <div class="stat"><b id="sQoder">0</b><span>Qoder</span></div>
+        <div class="stat"><b id="sTrae">0</b><span>Trae</span></div>
+        <div class="stat"><b id="sCredits">—</b><span>剩余积分</span></div>
       </div>
-
-      <div class="sec-title">最近一次自动签到</div>
-      <div class="card tight" id="ovLast"></div>
-    </section>
-
-    <!-- 积分 -->
-    <section class="page" id="p-credits">
-      <div class="sec-title">作用域</div>
-      <div class="chips" id="crScope"></div>
-      <div class="sec-title">积分概览 <span class="link" onclick="App.loadCredits()">刷新 ↻</span></div>
-      <div class="card" id="crSummary"></div>
-      <div class="sec-title">按账号</div>
-      <div id="crList"></div>
-    </section>
-
-    <!-- 签到 -->
-    <section class="page" id="p-checkin">
-      <div class="sec-title">今日签到</div>
-      <div class="card" id="ckToday"></div>
-
-      <div class="sec-title">自动签到</div>
       <div class="card">
-        <div class="between" style="margin-bottom:12px">
-          <div class="grow"><div style="font-weight:600">定时自动签到</div><div class="tiny muted">后台定时唤起，完成后发送通知</div></div>
-          <div class="switch" id="ckAutoSw" onclick="App.toggleAuto()"><i></i></div>
+        <div class="sec-t">最近执行 <span class="r" id="lastAt"></span></div>
+        <div id="homeResult"><div class="empty" style="padding:18px 8px">
+          <div class="ic">◎</div><p>还没有执行记录，点上面按钮开始</p></div></div>
+      </div>
+      <div class="card">
+        <div class="sec-t">怎么独立登录</div>
+        <div class="hint" style="margin-top:0">
+          1. 「账号」页点 <b>＋ 添加账号</b>，先选平台（WorkBuddy / Qoder / Trae），再选国内版或国际版。<br>
+          2. <b>WorkBuddy / Qoder</b> 可手机独立扫码授权；<b>Trae</b> 上游绑定桌面客户端设备私钥与
+             <code>127.0.0.1:17388</code> 回环，请粘贴 JWT 导入（一次导入，之后长期独立用）。<br>
+          3. 签到、领积分、查余额、刷新凭据全部由手机直连各平台官方接口完成。<br>
+          <span style="color:var(--warn)">同步到电脑是可选的</span>：只在「同步」页手动点才发生。
         </div>
-        <label class="fld"><span>执行间隔</span><select id="ckInterval" onchange="App.saveInterval()">
-          <option value="60">每 1 小时</option><option value="360">每 6 小时</option>
-          <option value="720">每 12 小时</option><option value="1440">每 24 小时</option>
-        </select></label>
-        <div class="hint">服务端也有自己的自动签到（<code>GET /api/checkin/config</code>）。手机端定时与服务端定时任务相互独立，建议只开一处，避免重复领取。</div>
       </div>
+    </div>
 
-      <div class="sec-title">账号签到 <span class="link" onclick="App.checkinAll()">全部签到 →</span></div>
-      <div class="card tight" id="ckAccounts"></div>
-
-      <div class="sec-title">签到日志 <span class="link" onclick="App.loadLogs()">刷新 ↻</span></div>
-      <div class="card tight" id="ckLogs"></div>
-    </section>
-
-    <!-- 账号 -->
-    <section class="page" id="p-accounts">
-      <div class="sec-title">作用域</div>
-      <div class="chips" id="acScope"></div>
-      <div class="row" style="margin:12px 0 10px">
-        <input id="acSearch" placeholder="搜索邮箱 / 备注 / UID" oninput="App.renderAccounts()" style="flex:1">
-        <button class="btn sm pri" onclick="App.sheet('addAccount')">+ 添加</button>
+    <!-- ============ 账号 ============ -->
+    <div class="view" id="v-accounts">
+      <button class="btn pri full" onclick="App.sheet('addAccount')">＋ 添加账号</button>
+      <div style="height:10px"></div>
+      <div class="seg" id="filterSeg">
+        <button id="fAll" class="on" onclick="App.setFilter('all')">全部</button>
+        <button id="fWb" onclick="App.setFilter('wb')">WB</button>
+        <button id="fQoder" onclick="App.setFilter('qoder')">Qoder</button>
+        <button id="fTrae" onclick="App.setFilter('trae')">Trae</button>
       </div>
-      <div id="acList"></div>
-      <div class="sec-title">回收站 <span class="link" onclick="App.loadTrash()">查看 →</span></div>
-      <div class="card tight" id="acTrash"><div class="tiny dim">点击「查看」加载已删除的账号，可恢复。</div></div>
-    </section>
-
-    <!-- 设置 -->
-    <section class="page" id="p-settings">
-      <div class="sec-title">服务连接</div>
-      <div class="card">
-        <label class="fld"><span>协议</span><select id="stScheme"><option value="http">http（本地 / 局域网）</option><option value="https">https（反向代理）</option></select></label>
-        <label class="fld"><span>主机地址（电脑的局域网 IP 或域名）</span><input id="stHost" placeholder="192.168.1.5"></label>
-        <label class="fld"><span>端口</span><input id="stPort" type="number" inputmode="numeric" placeholder="57890"></label>
-        <label class="fld"><span>访问令牌（可选，反向代理鉴权时填写）</span><input id="stToken" placeholder="留空即可"></label>
-        <div class="grid2">
-          <button class="btn" onclick="App.testConn()">测试连接</button>
-          <button class="btn pri" onclick="App.saveConn()">保存配置</button>
-        </div>
-        <div id="stTest" class="tiny muted" style="margin-top:10px"></div>
-      </div>
-
-      <div class="hint" style="margin-bottom:12px">
-        <b>电脑端启动方式</b><br>
-        桌面端执行 <code>buddy-switch serve --host 0.0.0.0</code>，并放开 Host 白名单：<br>
-        Linux / macOS：<code>BUDDY_SWITCH_ALLOWED_HOSTS=192.168.1.5:57890 buddy-switch serve --host 0.0.0.0</code><br>
-        Windows PowerShell：<code>$env:BUDDY_SWITCH_ALLOWED_HOSTS="192.168.1.5:57890"; buddy-switch serve --host 0.0.0.0</code><br>
-        把 IP 换成电脑在局域网中的实际地址，手机与电脑需在同一 Wi-Fi。
-      </div>
-
-      <div class="sec-title">应用</div>
-      <div class="card">
-        <div class="between" style="padding:6px 0"><div class="grow"><div style="font-weight:600">演示模式</div><div class="tiny muted">不连接服务端，使用内置示例数据浏览全部功能</div></div><div class="switch" id="stDemoSw" onclick="App.toggleDemo()"><i></i></div></div>
-        <div class="line"></div>
-        <div class="between" style="padding:6px 0"><div class="grow"><div style="font-weight:600">签到完成通知</div><div class="tiny muted">自动签到结束后推送系统通知</div></div><div class="switch" id="stNotifySw" onclick="App.toggleNotify()"><i></i></div></div>
-      </div>
-
-      <div class="sec-title">运行日志</div>
-      <div class="card tight"><pre class="code" id="stLog">（暂无日志）</pre><button class="btn sm ghost" style="margin-top:10px" onclick="App.clearLog()">清空日志</button></div>
-
-      <div class="sec-title">关于</div>
+      <div id="accList"></div>
       <div class="card tight">
-        <div class="kv"><span class="k">应用</span><span>Buddy Switch Agent 1.0.0</span></div>
-        <div class="kv"><span class="k">数据来源</span><span class="mono tiny" id="stBase">—</span></div>
-        <div class="kv"><span class="k">API 契约</span><span>src/lib/api.ts · 284 条路由</span></div>
-        <div class="kv"><span class="k">构建</span><span>Android 34 / minSdk 24</span></div>
+        <div class="sec-t">凭据说明</div>
+        <div class="hint" style="margin-top:0">
+          access_token 几小时过期，用 refresh_token 换新即可；refresh 过期才需要重新扫码。
+          两处时间分开显示，<b>0 / 未知</b> 不等于已过期。凭据只存本机，日志不打印明文。
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 同步（可选） ============ -->
+    <div class="view" id="v-sync">
+      <div class="card">
+        <div class="sec-t">可选：同步到电脑</div>
+        <div class="hint" style="margin-top:0">
+          手机端完全独立，以下功能<b>用不到可以整页忽略</b>。需要把账号交给电脑端
+          workbuddy-console 时才填：两端连同一 Wi-Fi，电脑端开启「局域网同步」。
+          协议与 fewards 一致（<code>/api/lansync/*</code>，默认端口 57900）。
+        </div>
         <div class="line"></div>
-        <div class="tiny dim">非官方第三方工具，仅用于个人非商业用途。所有数据只保存在本机与你自己填写的服务端；App 不直连任何第三方平台。使用前请阅读仓库的 DISCLAIMER。</div>
+        <div class="row2">
+          <label class="fld"><span>电脑局域网 IP</span><input id="syncHost" placeholder="192.168.1.5"></label>
+          <label class="fld"><span>端口</span><input id="syncPort" type="number" value="57900"></label>
+        </div>
+        <label class="fld"><span>配对码（电脑端显示）</span><input id="syncCode" placeholder="留空表示电脑端未设配对码"></label>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn sm" onclick="App.saveSync()">保存设置</button>
+          <button class="btn sm" onclick="App.syncTest()">测试连接</button>
+        </div>
+        <div id="syncTestResult" class="hint"></div>
       </div>
-
-      <div class="card tight" style="margin-bottom:20px">
-        <button class="btn ghost full sm" onclick="App.sheet('routes')">查看已适配的 API 路由</button>
+      <div class="card">
+        <div class="sec-t">手机 → 电脑</div>
+        <div class="hint" style="margin-top:0">把本机账号推给电脑端控制台，由电脑端合并规则落库（等于在电脑上建号）。</div>
+        <button class="btn full" style="margin-top:10px" onclick="App.syncPush()">推送全部账号到电脑</button>
       </div>
-    </section>
-  </main>
+      <div class="card">
+        <div class="sec-t">电脑 → 手机</div>
+        <div class="hint" style="margin-top:0">只读拉取：本机失效的账号补凭据、本机没有的直接建号，仍有效的一律不动。</div>
+        <button class="btn full" style="margin-top:10px" onclick="App.syncFetch()">从电脑同步凭据</button>
+      </div>
+      <div class="card">
+        <div class="sec-t">离线备份（不依赖电脑在线）</div>
+        <div class="hint" style="margin-top:0">导出明文 JSON 自行保管，或粘贴回来批量导入。</div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn sm" onclick="App.exportAccounts()">导出账号</button>
+          <button class="btn sm" onclick="App.sheet('import')">粘贴导入</button>
+        </div>
+      </div>
+    </div>
 
-  <nav id="nav">
-    <button data-p="overview" class="on" onclick="App.go('overview')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>概览</button>
-    <button data-p="credits" onclick="App.go('credits')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg>积分</button>
-    <button data-p="checkin" onclick="App.go('checkin')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>签到</button>
-    <button data-p="accounts" onclick="App.go('accounts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.2-5.5 6.5-5.5s5.9 2 6.5 5.5"/><path d="M17 11l2 2 3-3"/></svg>账号</button>
-    <button data-p="settings" onclick="App.go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2 3.4-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V22h-4v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2-3.4.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2-3.4.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V2h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2 3.4-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1H20v4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>设置</button>
-  </nav>
+    <!-- ============ 设置 ============ -->
+    <div class="view" id="v-settings">
+      <div class="card">
+        <div class="sec-t">本机行为</div>
+        <div class="sw"><div><div class="t">自动签到</div><div class="d">后台定时执行每日签到（受系统省电策略影响）</div></div>
+          <input type="checkbox" id="swAuto" onchange="App.toggleAuto(this.checked)"></div>
+        <label class="fld"><span>执行间隔（分钟，最小 15）</span>
+          <input id="intervalMin" type="number" value="360" onchange="App.saveInterval(this.value)"></label>
+        <div class="sw" style="margin-top:6px"><div><div class="t">结果通知</div><div class="d">自动签到完成后发系统通知</div></div>
+          <input type="checkbox" id="swNotify" onchange="App.saveBool('notify',this.checked)"></div>
+        <div class="sw"><div><div class="t">演示模式</div><div class="d">用假数据浏览全部界面，不发起任何网络请求</div></div>
+          <input type="checkbox" id="swDemo" onchange="App.saveBool('demo',this.checked)"></div>
+      </div>
+      <div class="card">
+        <div class="sec-t">运行日志 <span class="r"><button class="btn sm" onclick="App.clearLog()">清空</button></span></div>
+        <div id="logBox" class="log-box">（暂无日志）</div>
+      </div>
+      <div class="card">
+        <div class="sec-t">关于</div>
+        <div class="kv"><span>版本</span><b id="verText">2.1.0</b></div>
+        <div class="kv"><span>运行形态</span><b>三平台独立客户端（本机账号库）</b></div>
+        <div class="kv"><span>上游协议</span><b>fewards / workbuddy-console / switch core</b></div>
+        <div class="kv"><span>凭据存储</span><b>App 私有 SharedPreferences</b></div>
+        <div class="hint">账号信息默认只留在这台手机。同步到电脑是手动、可选的动作。</div>
+      </div>
+    </div>
+  </div>
 
-  <div class="mask" id="mask" onclick="if(event.target===this)App.closeSheet()"><div class="sheet" id="sheet"></div></div>
+  <div class="nv" id="nav"></div>
+
+  <div id="sheet"><div class="mask" onclick="App.closeSheet()"></div>
+    <div class="panel"><div class="handle"></div><div id="sheetBody"></div></div></div>
   <div id="toast"></div>
 </div>
 
 <script>
-/* =========================================================================
- * Buddy Switch Agent — 移动端 SPA
- * 契约：桌面端 webui 的 src/lib/api.ts（Tauri command → /api/* HTTP 路由）
- * 所有网络请求经原生桥 BuddySwitch.request() 发出，避免 file:// 跨源与
- * 服务端 api_guard 的 Origin / Sec-Fetch-Site 校验问题。
- * ========================================================================= */
-(function () {
-  'use strict';
+/* ================= 内嵌二维码编码器（Byte mode / ECL-M / mask0，已与标准库逐位校验） ================= */
+/* 自包含 QR Code 编码器：Byte mode / ECL-M / mask 0 / version 1..20
+   纠错块表与对齐位置表由 Python qrcode 库导出，保证与标准一致。无第三方运行时依赖。 */
+var QR = (function () {
+  var T = {"rs":{"1":[1,26,16],"2":[1,44,28],"3":[1,70,44],"4":[2,50,32],"5":[2,67,43],"6":[4,43,27],"7":[4,49,31],"8":[2,60,38,2,61,39],"9":[3,58,36,2,59,37],"10":[4,69,43,1,70,44],"11":[1,80,50,4,81,51],"12":[6,58,36,2,59,37],"13":[8,59,37,1,60,38],"14":[4,64,40,5,65,41],"15":[5,65,41,5,66,42],"16":[7,73,45,3,74,46],"17":[10,74,46,1,75,47],"18":[9,69,43,4,70,44],"19":[3,70,44,11,71,45],"20":[3,67,41,13,68,42]},"align":{"1":[],"2":[6,18],"3":[6,22],"4":[6,26],"5":[6,30],"6":[6,34],"7":[6,22,38],"8":[6,24,42],"9":[6,26,46],"10":[6,28,50],"11":[6,30,54],"12":[6,32,58],"13":[6,34,62],"14":[6,26,46,66],"15":[6,26,48,70],"16":[6,26,50,74],"17":[6,30,54,78],"18":[6,30,56,82],"19":[6,30,58,86],"20":[6,34,62,90]}};
+  function gfMul(x, y) { var z = 0; for (var i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z & 0xFF; }
+  function rsDivisor(deg) { var r = []; for (var i = 0; i < deg - 1; i++) r.push(0); r.push(1); var root = 1; for (var i = 0; i < deg; i++) { for (var j = 0; j < r.length; j++) { r[j] = gfMul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; } root = gfMul(root, 2); } return r; }
+  function rsRemainder(data, div) { var r = []; for (var i = 0; i < div.length; i++) r.push(0); for (var k = 0; k < data.length; k++) { var f = data[k] ^ r.shift(); r.push(0); for (var j = 0; j < div.length; j++) r[j] ^= gfMul(div[j], f); } return r; }
+  function rsInfo(v) { var t = T.rs[String(v)], blocks = [], ecc = t[1] - t[2], n = 0; for (var i = 0; i < t.length; i += 3) { blocks.push({ count: t[i], data: t[i + 2] }); n += t[i]; } return { blocks: blocks, ecc: ecc, n: n }; }
+  function rawModules(v) { var r = (16 * v + 128) * v + 64; if (v >= 2) { var na = Math.floor(v / 7) + 2; r -= (25 * na - 10) * na - 55; if (v >= 7) r -= 36; } return r; }
+  function dataCodewords(v) { var i = rsInfo(v); return Math.floor(rawModules(v) / 8) - i.ecc * i.n; }
+  function utf8(s) { var o = []; for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); if (c < 0x80) o.push(c); else if (c < 0x800) o.push(0xC0 | (c >> 6), 0x80 | (c & 63)); else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) { var c2 = s.charCodeAt(i + 1), cp = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00); i++; o.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63)); } else o.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); } return o; }
+  function bitsAppend(b, val, len) { for (var i = len - 1; i >= 0; i--) b.push((val >>> i) & 1); }
+  function chooseVersion(nBytes) { for (var v = 1; v <= 20; v++) { var cap = dataCodewords(v) * 8; if (4 + (v <= 9 ? 8 : 16) + nBytes * 8 <= cap) return v; } return -1; }
+  function encodeData(text, v) { var bytes = utf8(text), b = []; bitsAppend(b, 4, 4); bitsAppend(b, bytes.length, v <= 9 ? 8 : 16); for (var i = 0; i < bytes.length; i++) bitsAppend(b, bytes[i], 8); var cap = dataCodewords(v) * 8, term = Math.min(4, cap - b.length); bitsAppend(b, 0, term); while (b.length % 8 !== 0) b.push(0); var cw = []; for (var k = 0; k < b.length; k += 8) { var x = 0; for (var j = 0; j < 8; j++) x = (x << 1) | b[k + j]; cw.push(x); } var pad = [0xEC, 0x11], p = 0; while (cw.length < dataCodewords(v)) cw.push(pad[p++ % 2]); return cw; }
+  function addEcc(data, v) { var info = rsInfo(v), div = rsDivisor(info.ecc), blocks = [], idx = 0; for (var g = 0; g < info.blocks.length; g++) { var sp = info.blocks[g]; for (var q = 0; q < sp.count; q++) { var chunk = data.slice(idx, idx + sp.data); idx += sp.data; blocks.push({ d: chunk, e: rsRemainder(chunk, div) }); } } var out = [], maxD = 0; for (var i = 0; i < blocks.length; i++) maxD = Math.max(maxD, blocks[i].d.length); for (var i = 0; i < maxD; i++) for (var j = 0; j < blocks.length; j++) if (i < blocks[j].d.length) out.push(blocks[j].d[i]); for (var i = 0; i < info.ecc; i++) for (var j = 0; j < blocks.length; j++) out.push(blocks[j].e[i]); return out; }
+  function getBit(x, i) { return ((x >>> i) & 1) !== 0; }
 
-  /* ---------- 原生桥（含浏览器预览降级） ---------- */
-  var HAS_NATIVE = !!window.BuddySwitch;
-  var Native = window.BuddySwitch;
-  if (!Native) {
-    var store = {};
-    Native = {
-      getConfig: function () { return localStorage.getItem('bs_config') || '{}'; },
-      setConfig: function (j) { localStorage.setItem('bs_config', j); },
-      request: function (id, method, path, body) {
-        setTimeout(function () {
-          var ok = false, status = 0, text = '{"error":"浏览器预览模式：请使用 App 连接服务端，或开启演示模式"}';
-          window.__bsCallback(id, ok, status, text);
-        }, 30);
-      },
-      setAutoCheckin: function () {}, toast: function () {}, notify: function () {},
-      openUrl: function (u) { window.open(u, '_blank'); },
-      getLog: function () { return localStorage.getItem('bs_log') || ''; },
-      appendLog: function () {}, clearLog: function () { localStorage.removeItem('bs_log'); },
-      lastCheckin: function () { return ''; }
-    };
-  }
-
-  /* ---------- Promise 化 API ---------- */
-  var seq = 0, pending = {};
-  window.__bsCallback = function (id, ok, status, body) {
-    var fn = pending[id]; if (!fn) return;
-    delete pending[id]; fn({ ok: ok, status: status, text: body || '' });
-  };
-  function raw(method, path, body) {
-    return new Promise(function (resolve) {
-      var id = 'r' + (++seq);
-      pending[id] = resolve;
-      try {
-        Native.request(id, method, path, body == null ? '' : (typeof body === 'string' ? body : JSON.stringify(body)));
-      } catch (e) { pending[id]({ ok: false, status: -1, text: '{"error":"' + e.message + '"}' }); }
-    });
-  }
-  function api(method, path, body) {
-    if (S.cfg.demo) return Mock.request(method, path, body);
-    return raw(method, path, body).then(function (r) {
-      var data = {};
-      try { data = JSON.parse(r.text); } catch (e) { data = { raw: r.text }; }
-      if (!r.ok) throw new Error(data.error || data.message || ('HTTP ' + r.status));
-      return data;
-    });
-  }
-
-  /* ---------- 作用域（与 src/lib/scope.ts 一致） ---------- */
-  var SCOPES = [
-    { id: 'wb-cn', name: 'WorkBuddy 国内', short: 'WB·CN', color: '#6366f1' },
-    { id: 'wb-global', name: 'WorkBuddy 国际', short: 'WB·INTL', color: '#818cf8' },
-    { id: 'trae-cn', name: 'Trae 国内', short: 'TRAE·CN', color: '#38bdf8' },
-    { id: 'trae-global', name: 'Trae 国际', short: 'TRAE·INTL', color: '#22d3ee' },
-    { id: 'qoder-cn', name: 'Qoder 国内', short: 'QODER·CN', color: '#a78bfa' },
-    { id: 'qoder-global', name: 'Qoder 国际', short: 'QODER·INTL', color: '#f472b6' }
-  ];
-  function scopeMeta(id) { for (var i = 0; i < SCOPES.length; i++) if (SCOPES[i].id === id) return SCOPES[i]; return SCOPES[0]; }
-  function regionOf(scope) { return scope.indexOf('global') >= 0 ? 'global' : 'cn'; }
-  function platformOf(scope) { return scope.indexOf('trae') === 0 ? 'trae' : (scope.indexOf('qoder') === 0 ? 'qoder' : 'wb'); }
-
-  /* ---------- 全局状态 ---------- */
-  var S = {
-    cfg: {}, page: 'overview', scope: 'wb-cn',
-    accounts: [], credits: [], checkinStatus: [], logs: [], trash: null,
-    status: null, connected: false, loading: false, lastReport: null
-  };
-
-  /* ---------- 演示数据 ---------- */
-  var DEMO_ACCOUNTS = [
-    { id: 'a1', uid: 'u_8f21c0', email: 'dev.primary@example.com', nickname: '主力号', remark: '日常开发', groupName: '工作', needsRelogin: false, expiresAt: Date.now() + 86400000 * 42, totalCapacity: 2000, totalRemaining: 1380, todayCheckedIn: true },
-    { id: 'a2', uid: 'u_2da91b', email: 'side.project@example.com', nickname: '备用 A', remark: '额度充足', groupName: '工作', needsRelogin: false, expiresAt: Date.now() + 86400000 * 9, totalCapacity: 1500, totalRemaining: 420, todayCheckedIn: false },
-    { id: 'a3', uid: 'u_b7c403', email: 'trial.2026@example.com', nickname: '试用号', remark: '即将到期', groupName: '试用', needsRelogin: true, needsReloginReason: 'token 已过期', expiresAt: Date.now() + 86400000 * 2, totalCapacity: 800, totalRemaining: 96, todayCheckedIn: false },
-    { id: 'a4', uid: 'u_19ef55', email: 'intl.backup@example.com', nickname: '国际备用', remark: '', groupName: '', needsRelogin: false, expiresAt: null, totalCapacity: 3000, totalRemaining: 2760, todayCheckedIn: true }
-  ];
-  var Mock = {
-    request: function (method, path, body) {
-      return new Promise(function (resolve) {
-        setTimeout(function () {
-          var b = body || {};
-          if (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }
-          var r = {};
-          if (path.indexOf('/api/status') === 0) r = { running: true, version: '1.0.0-demo', current: { email: 'dev.primary@example.com', nickname: '主力号' } };
-          else if (path.indexOf('/api/accounts/list') === 0 || path.indexOf('/api/trae/accounts') === 0 || path.indexOf('/api/qoder/accounts') === 0 || path.indexOf('/api/accounts') === 0) r = { accounts: DEMO_ACCOUNTS.slice() };
-          else if (path.indexOf('/api/credits/query') === 0 || path.indexOf('/api/credits') === 0) {
-            var a = findAccount(b.accountId) || DEMO_ACCOUNTS[0];
-            r = { ok: true, accountId: a.id, accountName: a.email, totalCapacity: a.totalCapacity, totalRemaining: a.totalRemaining, expiringSoon: a.expiresAt && (a.expiresAt - Date.now()) < 86400000 * 7, soonestExpireAt: a.expiresAt, resources: [{ name: '基础额度包', remaining: a.totalRemaining, expireAt: a.expiresAt }] };
-          }
-          else if (path.indexOf('/api/credits/stats') === 0) r = { generatedAt: Date.now(), summary: { totalRemaining: 4656 }, daily: [], accounts: [], events: [] };
-          else if (path.indexOf('/api/checkin/status') === 0) r = { ok: true, todayCheckedIn: !!(findAccount(b.accountId) || {}).todayCheckedIn };
-          else if (path.indexOf('/api/checkin/logs') === 0) r = { logs: demoLogs() };
-          else if (path.indexOf('/api/checkin/config') === 0) r = { enabled: false, keepalive_days: 7, lazy_refresh_hours: 6 };
-          else if (path.indexOf('/api/checkin/claim') === 0) r = { ok: true, result: 'claimed' };
-          else if (path.indexOf('/api/checkin/all') === 0 || path.indexOf('/api/checkin') === 0 || path.indexOf('/api/trae/checkin') === 0) r = { accounts: DEMO_ACCOUNTS.map(function (a) { return { accountId: a.id, email: a.email, result: 'success' }; }), status: 'ok' };
-          else if (path.indexOf('/api/accounts/trash') === 0) r = { entries: [{ key: 't1', email: 'old.account@example.com' }] };
-          else if (path.indexOf('/api/oauth/start') === 0) r = { loginId: 'demo-login', verificationUri: 'https://example.com/oauth/demo', expiresIn: 300 };
-          else if (path.indexOf('/api/oauth/status') === 0) r = { done: false };
-          else if (path.indexOf('/api/switch') === 0) r = { ok: true, account: b.accountId };
-          else r = { ok: true };
-          resolve(r);
-        }, 180 + Math.random() * 220);
-      });
+  function build(text) {
+    var v = chooseVersion(utf8(text).length); if (v < 0) return null;
+    var cw = addEcc(encodeData(text, v), v);
+    var size = v * 4 + 17, m = [], fx = [];
+    for (var y = 0; y < size; y++) { m.push(new Array(size)); fx.push(new Array(size)); for (var x = 0; x < size; x++) { m[y][x] = false; fx[y][x] = false; } }
+    function setF(x, y, d) { if (x >= 0 && x < size && y >= 0 && y < size) { m[y][x] = d; fx[y][x] = true; } }
+    // timing
+    for (var i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    // finder
+    function finder(cx, cy) { for (var dy = -4; dy <= 4; dy++) for (var dx = -4; dx <= 4; dx++) { var d = Math.max(Math.abs(dx), Math.abs(dy)); setF(cx + dx, cy + dy, d !== 2 && d !== 4); } }
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    // alignment
+    var ap = T.align[String(v)], na = ap.length;
+    for (var i = 0; i < na; i++) for (var j = 0; j < na; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+      var cx = ap[j], cy = ap[i];
+      for (var dy = -2; dy <= 2; dy++) for (var dx = -2; dx <= 2; dx++) setF(cx + dx, cy + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
     }
-  };
-  function findAccount(id) { for (var i = 0; i < DEMO_ACCOUNTS.length; i++) if (DEMO_ACCOUNTS[i].id === id) return DEMO_ACCOUNTS[i]; return null; }
-  function demoLogs() {
-    var out = [];
-    for (var i = 0; i < 7; i++) out.push({ ts: Date.now() - i * 3600000 * 7, accountId: 'a' + (i % 4 + 1), email: DEMO_ACCOUNTS[i % 4].email, result: i % 5 === 3 ? 'rate_limited' : 'success', error: i % 5 === 3 ? '触发限流，已跳过' : undefined });
-    return out;
-  }
-
-  /* ---------- 工具 ---------- */
-  var $ = function (s) { return document.querySelector(s); };
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function n(v, d) { var x = Number(v); return isFinite(x) ? x : (d || 0); }
-  function fmt(v) { return n(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 }); }
-  function when(ts) {
-    if (!ts) return '—';
-    var t = Number(ts); if (t < 1e12) t *= 1000;
-    var d = new Date(t), diff = d - Date.now();
-    var days = Math.round(diff / 86400000);
-    var base = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
-    return base + (Math.abs(days) < 30 ? '（' + (days >= 0 ? days + ' 天后' : -days + ' 天前') + '）' : '');
-  }
-  function ago(ts) {
-    if (!ts) return '—'; var t = Number(ts); if (t < 1e12) t *= 1000;
-    var m = Math.floor((Date.now() - t) / 60000);
-    if (m < 1) return '刚刚'; if (m < 60) return m + ' 分钟前';
-    if (m < 1440) return Math.floor(m / 60) + ' 小时前';
-    return Math.floor(m / 1440) + ' 天前';
-  }
-  function toast(msg, err) {
-    var t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
-    clearTimeout(t._tm); t._tm = setTimeout(function () { t.className = ''; }, 2600);
-    try { Native.toast(msg); } catch (e) {}
-  }
-  function colorOf(str) {
-    var pal = ['#6366f1', '#8b5cf6', '#ec4899', '#38bdf8', '#f59e0b', '#10b981', '#a78bfa'];
-    var h = 0; str = String(str || '?'); for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-    return pal[h % pal.length];
-  }
-  function pct(a, b) { if (!b) return 0; return Math.max(0, Math.min(100, Math.round(a / b * 100))); }
-  function barClass(p) { return p < 20 ? 'warn' : (p > 60 ? 'ok' : ''); }
-
-  /* ---------- 配置 ---------- */
-  function loadConfig() {
-    var c = {}; try { c = JSON.parse(Native.getConfig() || '{}'); } catch (e) {}
-    S.cfg = {
-      host: c.host || '192.168.1.1', port: c.port || 57890, scheme: c.scheme || 'http',
-      token: c.token || '', scope: c.scope || 'wb-cn', demo: !!c.demo,
-      autoCheckin: !!c.autoCheckin, intervalMin: c.intervalMin || 360,
-      notify: c.notify !== false, configured: !!c.configured,
-      baseUrl: c.baseUrl || (c.scheme || 'http') + '://' + (c.host || '192.168.1.1') + ':' + (c.port || 57890)
-    };
-    // 没有原生桥 = 桌面浏览器预览，直接用内置数据把界面完整呈现出来。
-    if (!HAS_NATIVE) { S.cfg.demo = true; S.cfg.configured = true; }
-    S.scope = S.cfg.scope;
-  }
-  function saveConfig(patch) {
-    for (var k in patch) if (patch.hasOwnProperty(k)) S.cfg[k] = patch[k];
-    try { Native.setConfig(JSON.stringify(S.cfg)); } catch (e) {}
-  }
-
-  /* ---------- 数据加载 ---------- */
-  function accountsFor(scope) {
-    var p = platformOf(scope), r = regionOf(scope);
-    if (p === 'trae') return api('GET', '/api/trae/accounts?region=' + r);
-    if (p === 'qoder') return api('GET', '/api/qoder/accounts?scope=' + encodeURIComponent(scope));
-    return api('GET', '/api/accounts/list?scope=' + encodeURIComponent(scope));
-  }
-  function normalizeAccounts(data) {
-    var a = data && (data.accounts || data.items || data.data);
-    if (!a || !a.length) return [];
-    return a.map(function (x) {
-      return {
-        id: x.id || x.accountId || x.uid || x.userId || '',
-        uid: x.uid || x.userId || '',
-        email: x.email || x.account || '',
-        nickname: x.nickname || x.name || '',
-        remark: x.remark || x.note || '',
-        groupName: x.groupName || x.group || '',
-        needsRelogin: !!(x.needsRelogin || x.needs_relogin),
-        expiresAt: x.expiresAt || x.expires_at || null,
-        todayCheckedIn: !!x.todayCheckedIn,
-        totalCapacity: x.totalCapacity, totalRemaining: x.totalRemaining
-      };
-    });
-  }
-  function loadAccounts() {
-    return accountsFor(S.scope).then(function (d) {
-      S.accounts = normalizeAccounts(d);
-      return S.accounts;
-    }).catch(function (e) { S.accounts = []; toast('账号加载失败：' + e.message, true); return []; });
-  }
-
-  /* ---------- 渲染 ---------- */
-  function renderScopeChips() {
-    var html = SCOPES.map(function (s) {
-      return '<div class="chip' + (s.id === S.scope ? ' on' : '') + '" onclick="App.setScope(\'' + s.id + '\')">' + esc(s.short) + '</div>';
-    }).join('');
-    $('#crScope').innerHTML = html; $('#acScope').innerHTML = html;
-  }
-
-  function renderOverview() {
-    var acc = S.accounts.length ? S.accounts : (S.cfg.demo ? DEMO_ACCOUNTS : []);
-    var checked = acc.filter(function (a) { return a.todayCheckedIn; }).length;
-    var totalRem = 0, expiring = 0, relogin = 0;
-    acc.forEach(function (a) {
-      var c = a.totalRemaining != null ? a.totalRemaining : (findAccount(a.id) || {}).totalRemaining || 0;
-      totalRem += n(c);
-      if (a.needsRelogin) relogin++;
-      var e = a.expiresAt || (findAccount(a.id) || {}).expiresAt;
-      if (e && (Number(e) - Date.now()) < 86400000 * 7) expiring++;
-    });
-    $('#ovStats').innerHTML =
-      stat('账号总数', acc.length, '当前作用域 ' + scopeMeta(S.scope).short, '#6366f1') +
-      stat('今日已签到', checked + ' / ' + acc.length, checked === acc.length && acc.length ? '全部完成' : '仍有待签到', '#34d399') +
-      stat('可用积分', fmt(totalRem), '合计剩余额度', '#38bdf8') +
-      stat('需要关注', relogin + expiring, relogin + ' 需重登 · ' + expiring + ' 将到期', '#fbbf24');
-
-    var todos = [];
-    if (relogin) todos.push({ t: '账号需要重新登录', d: relogin + ' 个账号凭据已失效，请重新扫码授权', c: 'err', go: 'accounts' });
-    if (checked < acc.length) todos.push({ t: '今日尚未全部签到', d: (acc.length - checked) + ' 个账号还未领取今日额度', c: 'warn', go: 'checkin' });
-    if (expiring) todos.push({ t: '积分即将到期', d: expiring + ' 个账号的额度包 7 天内到期', c: 'warn', go: 'credits' });
-    if (!todos.length) todos.push({ t: '一切就绪', d: '没有待处理事项，账号状态良好', c: 'ok', go: '' });
-    $('#ovTodo').innerHTML = todos.map(function (x) {
-      return '<div class="item row" ' + (x.go ? 'onclick="App.go(\'' + x.go + '\')"' : '') + '>' +
-        '<span class="tag ' + x.c + '">' + (x.c === 'ok' ? '完成' : x.c === 'warn' ? '待办' : '异常') + '</span>' +
-        '<div class="grow"><div style="font-weight:600;font-size:13px">' + esc(x.t) + '</div><div class="tiny muted">' + esc(x.d) + '</div></div>' +
-        (x.go ? '<span class="dim">›</span>' : '') + '</div>';
-    }).join('');
-
-    var rep = S.lastReport;
-    $('#ovLast').innerHTML = rep
-      ? '<div class="between"><div><div style="font-weight:600">' + (rep.demo ? '演示模式' : '签到完成') + '</div><div class="tiny muted">' + ago(rep.at || Date.now()) + ' · 成功 ' + n(rep.ok) + ' · 失败 ' + n(rep.fail) + '</div></div><span class="tag ' + (n(rep.fail) ? 'warn' : 'ok') + '">' + (n(rep.fail) ? '部分失败' : '正常') + '</span></div>'
-      : '<div class="tiny dim">还没有自动签到记录。到「签到」页开启定时签到，或点上方一键签到。</div>';
-
-    $('#ovMode').textContent = S.cfg.demo ? '演示' : (S.connected ? '已连接' : '离线');
-    $('#ovMode').className = 'tag ' + (S.cfg.demo ? 'pri' : (S.connected ? 'ok' : 'err'));
-  }
-  function stat(k, v, d, color) {
-    return '<div class="stat"><div class="k"><span style="width:6px;height:6px;border-radius:50%;background:' + color + '"></span>' + esc(k) + '</div><div class="v">' + esc(v) + '</div><div class="d">' + esc(d) + '</div></div>';
-  }
-
-  function renderCredits() {
-    var acc = S.accounts.length ? S.accounts : (S.cfg.demo ? DEMO_ACCOUNTS : []);
-    var cap = 0, rem = 0;
-    var cards = acc.map(function (a) {
-      var f = findAccount(a.id) || {};
-      var c = n(a.totalCapacity, n(f.totalCapacity, 0)), r = n(a.totalRemaining, n(f.totalRemaining, 0));
-      cap += c; rem += r;
-      var p = pct(r, c), e = a.expiresAt || f.expiresAt;
-      var soon = e && (Number(e) - Date.now()) < 86400000 * 7;
-      return '<div class="card tight">' +
-        '<div class="row"><div class="avatar" style="background:' + colorOf(a.email) + '">' + esc((a.email || a.nickname || '?').charAt(0).toUpperCase()) + '</div>' +
-        '<div class="grow"><div class="ell" style="font-weight:600;font-size:13px">' + esc(a.email || a.nickname || a.id) + '</div>' +
-        '<div class="tiny muted">' + esc(a.remark || a.groupName || scopeMeta(S.scope).name) + '</div></div>' +
-        (soon ? '<span class="tag warn">即将到期</span>' : (a.needsRelogin ? '<span class="tag err">需重登</span>' : '<span class="tag ok">正常</span>')) + '</div>' +
-        '<div class="between" style="margin-top:13px"><div><span class="big">' + fmt(r) + '</span><span class="tiny muted"> / ' + fmt(c) + '</span><div class="tiny dim">剩余 / 总额度</div></div>' +
-        '<div style="text-align:right"><div class="tiny muted">到期</div><div class="small">' + esc(when(e)) + '</div></div></div>' +
-        '<div class="bar ' + barClass(p) + '"><i style="width:' + p + '%"></i></div>' +
-        '<div class="tiny dim" style="margin-top:7px">剩余 ' + p + '% · 路由 <span class="mono">/api/credits/query</span></div></div>';
-    }).join('');
-    $('#crSummary').innerHTML = '<div class="between"><div><div class="tiny muted">作用域合计剩余</div><div class="big" style="color:var(--pri2)">' + fmt(rem) + '</div></div>' +
-      '<div style="text-align:right"><div class="tiny muted">总额度</div><div style="font-size:17px;font-weight:700">' + fmt(cap) + '</div></div></div>' +
-      '<div class="bar"><i style="width:' + pct(rem, cap) + '%"></i></div>' +
-      '<div class="tiny dim" style="margin-top:8px">' + esc(scopeMeta(S.scope).name) + ' · ' + acc.length + ' 个账号 · 点击右上角刷新可重新拉取</div>';
-    $('#crList').innerHTML = cards || '<div class="card empty">暂无账号数据</div>';
-  }
-
-  function renderCheckin() {
-    var acc = S.accounts.length ? S.accounts : (S.cfg.demo ? DEMO_ACCOUNTS : []);
-    var done = acc.filter(function (a) { return a.todayCheckedIn; }).length;
-    $('#ckToday').innerHTML =
-      '<div class="between"><div><div class="tiny muted">今日签到进度</div><div class="big" style="color:' + (done === acc.length && acc.length ? 'var(--ok)' : 'var(--warn)') + '">' + done + ' / ' + acc.length + '</div></div>' +
-      '<button class="btn sm ' + (done === acc.length && acc.length ? '' : 'pri') + '" onclick="App.checkinAll()">' + (done === acc.length && acc.length ? '重新签到' : '一键签到全部') + '</button></div>' +
-      '<div class="bar ' + (done === acc.length && acc.length ? 'ok' : '') + '"><i style="width:' + (acc.length ? Math.round(done / acc.length * 100) : 0) + '%"></i></div>';
-
-    $('#ckAutoSw').className = 'switch' + (S.cfg.autoCheckin ? ' on' : '');
-    $('#ckInterval').value = String(S.cfg.intervalMin);
-    $('#ckAccounts').innerHTML = acc.map(function (a) {
-      return '<div class="item row"><div class="grow"><div class="ell" style="font-size:12.5px;font-weight:600">' + esc(a.email || a.nickname || a.id) + '</div>' +
-        '<div class="tiny muted">' + esc(a.remark || scopeMeta(S.scope).short) + '</div></div>' +
-        (a.todayCheckedIn ? '<span class="tag ok">已签到</span>' : '<button class="btn sm" onclick="App.checkinOne(\'' + esc(a.id) + '\')">签到</button>') + '</div>';
-    }).join('') || '<div class="tiny dim" style="padding:8px">暂无账号</div>';
-
-    $('#ckLogs').innerHTML = S.logs.length ? S.logs.slice(0, 12).map(function (l) {
-      var ok = /success|ok|claimed|已签/.test(String(l.result || ''));
-      return '<div class="item row"><span class="tag ' + (ok ? 'ok' : 'warn') + '">' + (ok ? '成功' : '跳过') + '</span>' +
-        '<div class="grow"><div class="ell tiny">' + esc(l.email || l.accountId || '未知账号') + '</div><div class="tiny dim">' + esc(l.error || l.result || '') + '</div></div>' +
-        '<span class="tiny dim">' + ago(l.ts) + '</span></div>';
-    }).join('') : '<div class="tiny dim" style="padding:8px">暂无签到记录</div>';
-  }
-
-  function renderAccounts() {
-    var acc = S.accounts.length ? S.accounts : (S.cfg.demo ? DEMO_ACCOUNTS : []);
-    var q = ($('#acSearch').value || '').toLowerCase();
-    var list = acc.filter(function (a) {
-      return !q || [a.email, a.nickname, a.remark, a.uid, a.groupName].join(' ').toLowerCase().indexOf(q) >= 0;
-    });
-    $('#acList').innerHTML = list.map(function (a, i) {
-      var cur = S.status && S.status.current && (S.status.current.email === a.email);
-      return '<div class="card tight">' +
-        '<div class="row"><div class="avatar" style="background:' + colorOf(a.email) + '">' + esc((a.email || '?').charAt(0).toUpperCase()) + '</div>' +
-        '<div class="grow"><div class="ell" style="font-weight:600;font-size:13px">' + esc(a.email || a.nickname || a.id) + '</div>' +
-        '<div class="tiny muted ell">' + esc(a.nickname || '') + (a.groupName ? ' · ' + esc(a.groupName) : '') + '</div></div>' +
-        (cur ? '<span class="tag pri">当前</span>' : '') + '</div>' +
-        '<div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">' +
-        (a.needsRelogin ? '<span class="tag err">需重新登录</span>' : '<span class="tag ok">凭据有效</span>') +
-        (a.remark ? '<span class="tag gray">' + esc(a.remark) + '</span>' : '') +
-        '<span class="tag gray">' + esc(scopeMeta(S.scope).short) + '</span></div>' +
-        '<div class="row" style="margin-top:11px;gap:6px">' +
-        '<button class="btn sm" onclick="App.switchAccount(\'' + esc(a.id) + '\')">切换</button>' +
-        '<button class="btn sm ghost" onclick="App.remark(\'' + esc(a.id) + '\')">备注</button>' +
-        '<button class="btn sm ghost" onclick="App.loadCreditsFor(\'' + esc(a.id) + '\')">积分</button>' +
-        '<button class="btn sm err" style="margin-left:auto" onclick="App.delAccount(\'' + esc(a.id) + '\')">删除</button></div></div>';
-    }).join('') || '<div class="card empty">' + (q ? '没有匹配的账号' : '暂无账号，点右上角「+ 添加」') + '</div>';
-  }
-
-  function renderTrash() {
-    if (!S.trash) return;
-    var arr = S.trash.entries || S.trash.items || [];
-    $('#acTrash').innerHTML = arr.length ? arr.map(function (e) {
-      return '<div class="item row"><div class="grow"><div class="tiny ell">' + esc(e.email || e.key) + '</div></div>' +
-        '<button class="btn sm ok" onclick="App.restore(\'' + esc(e.key) + '\')">恢复</button></div>';
-    }).join('') : '<div class="tiny dim" style="padding:8px">回收站是空的</div>';
-  }
-
-  function renderSettings() {
-    $('#stScheme').value = S.cfg.scheme; $('#stHost').value = S.cfg.host;
-    $('#stPort').value = S.cfg.port; $('#stToken').value = S.cfg.token;
-    $('#stDemoSw').className = 'switch' + (S.cfg.demo ? ' on' : '');
-    $('#stNotifySw').className = 'switch' + (S.cfg.notify ? ' on' : '');
-    $('#stBase').textContent = S.cfg.baseUrl;
-    var log = ''; try { log = Native.getLog() || ''; } catch (e) {}
-    $('#stLog').textContent = log ? log.split('\n').filter(Boolean).slice(0, 40).map(function (l) {
-      var p = l.split('\t'); var t = Number(p[0]);
-      return (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '') + '  ' + (p[1] || '');
-    }).join('\n') : '（暂无日志）';
-  }
-
-  function renderConn() {
-    var el = $('#connLine');
-    if (S.cfg.demo) el.innerHTML = '<span class="dot on"></span>演示模式 · 内置数据';
-    else if (S.connected) el.innerHTML = '<span class="dot on"></span>已连接 ' + esc(S.cfg.host) + ':' + S.cfg.port;
-    else el.innerHTML = '<span class="dot off"></span>未连接 · ' + esc(S.cfg.host) + ':' + S.cfg.port;
-  }
-
-  /* ---------- 加载编排 ---------- */
-  /** 账号列表接口不保证带积分，逐个补拉 /api/credits/query（最多 10 个，避免打爆服务端）。 */
-  function loadCreditDetails() {
-    if (S.cfg.demo || !S.accounts.length) return Promise.resolve();
-    var jobs = S.accounts.slice(0, 10).map(function (a) {
-      return api('POST', '/api/credits/query', { scope: S.scope, accountId: a.id })
-        .then(function (d) {
-          if (d.totalCapacity != null) a.totalCapacity = n(d.totalCapacity);
-          if (d.totalRemaining != null) a.totalRemaining = n(d.totalRemaining);
-          if (d.soonestExpireAt != null) a.expiresAt = d.soonestExpireAt;
-          if (d.error) a.creditError = d.error;
-        }).catch(function () {});
-    });
-    return Promise.all(jobs);
-  }
-
-  function refreshAll(silent) {
-    if (S.loading) return Promise.resolve();
-    S.loading = true;
-    var p = S.cfg.demo ? Promise.resolve({ running: true, version: 'demo' }) : api('GET', '/api/status');
-    return p.then(function (st) { S.status = st; S.connected = true; })
-      .catch(function (e) { S.connected = false; if (!silent) toast(e.message, true); })
-      .then(loadAccounts)
-      .then(loadCreditDetails)
-      .then(function () {
-        return Promise.all([
-          api('GET', '/api/checkin/logs').then(function (d) { S.logs = d.logs || d.items || []; }).catch(function () { S.logs = S.cfg.demo ? demoLogs() : []; }),
-          api('GET', '/api/checkin/status').then(function (d) {
-            var m = {}; (d.accounts || d.statuses || []).forEach(function (x) { m[x.accountId || x.id] = !!x.todayCheckedIn; });
-            S.accounts.forEach(function (a) { if (m.hasOwnProperty(a.id)) a.todayCheckedIn = m[a.id]; });
-          }).catch(function () {})
-        ]);
-      })
-      .then(function () {
-        try {
-          var lr = Native.lastCheckin && Native.lastCheckin();
-          if (lr) S.lastReport = JSON.parse(lr);
-        } catch (e) {}
-        renderConn(); renderScopeChips();
-        renderOverview(); renderCredits(); renderCheckin(); renderAccounts(); renderSettings();
-        S.loading = false;
-      });
-  }
-
-  /* ---------- 交互 App ---------- */
-  var App = {
-    go: function (p) {
-      S.page = p;
-      var pages = document.querySelectorAll('.page');
-      for (var i = 0; i < pages.length; i++) pages[i].classList.toggle('active', pages[i].id === 'p-' + p);
-      var btns = document.querySelectorAll('nav button');
-      for (var j = 0; j < btns.length; j++) btns[j].classList.toggle('on', btns[j].getAttribute('data-p') === p);
-      $('#main').scrollTop = 0;
-      if (p === 'settings') renderSettings();
-    },
-    setScope: function (s) {
-      S.scope = s; saveConfig({ scope: s }); renderScopeChips();
-      loadAccounts().then(function () { renderOverview(); renderCredits(); renderCheckin(); renderAccounts(); });
-    },
-    refresh: function () { toast('正在刷新…'); refreshAll(false).then(function () { toast(S.connected || S.cfg.demo ? '已刷新' : '连接失败，请检查设置'); }); },
-    loadCredits: function () { loadAccounts().then(function () { renderCredits(); toast('积分已刷新'); }); },
-    loadLogs: function () {
-      api('GET', '/api/checkin/logs').then(function (d) { S.logs = d.logs || d.items || []; renderCheckin(); toast('日志已刷新'); })
-        .catch(function (e) { toast('日志加载失败：' + e.message, true); });
-    },
-    checkinAll: function () {
-      toast('正在签到…');
-      var p, pf = platformOf(S.scope);
-      if (pf === 'trae') p = api('POST', '/api/trae/checkin', { options: { scope: 'all', skipCheckedIn: true } });
-      else if (pf === 'qoder') p = api('POST', '/api/qoder/checkin/claim', { scope: S.scope, uid: S.accounts.length ? S.accounts[0].id : '' });
-      else p = api('POST', '/api/checkin/all', { region: regionOf(S.scope) });
-      return p.then(function (r) {
-        S.lastReport = { at: Date.now(), ok: (r.accounts || []).filter(function (x) { return !x.error; }).length, fail: (r.accounts || []).filter(function (x) { return x.error; }).length, demo: S.cfg.demo };
-        S.accounts.forEach(function (a) { a.todayCheckedIn = true; });
-        renderOverview(); renderCheckin(); toast('签到完成');
-      }).catch(function (e) { toast('签到失败：' + e.message, true); });
-    },
-    checkinOne: function (id) {
-      api('POST', '/api/checkin', { accountId: id, region: regionOf(S.scope) })
-        .then(function () {
-          S.accounts.forEach(function (a) { if (a.id === id) a.todayCheckedIn = true; });
-          renderOverview(); renderCheckin(); toast('签到成功');
-        }).catch(function (e) { toast('签到失败：' + e.message, true); });
-    },
-    toggleAuto: function () {
-      var v = !S.cfg.autoCheckin; saveConfig({ autoCheckin: v });
-      try { Native.setAutoCheckin(v, S.cfg.intervalMin); } catch (e) {}
-      renderCheckin(); toast(v ? '自动签到已开启' : '自动签到已关闭');
-    },
-    saveInterval: function () {
-      var v = n($('#ckInterval').value, 360); saveConfig({ intervalMin: v });
-      try { Native.setAutoCheckin(S.cfg.autoCheckin, v); } catch (e) {}
-      toast('间隔已保存：' + (v >= 1440 ? (v / 1440) + ' 天' : (v / 60) + ' 小时'));
-    },
-    testConn: function () {
-      var b = readConn(); saveConfig(b);
-      var el = $('#stTest'); el.innerHTML = '<span class="spin"></span> 正在连接 ' + esc(S.cfg.baseUrl) + ' …';
-      raw('GET', '/api/status').then(function (r) {
-        if (r.ok) { el.innerHTML = '<span style="color:var(--ok)">✓ 连接成功</span> · ' + esc(r.text.slice(0, 90)); S.connected = true; renderConn(); }
-        else { var d = {}; try { d = JSON.parse(r.text); } catch (e) {} el.innerHTML = '<span style="color:var(--err)">✗ 连接失败</span> ' + esc(d.error || ('HTTP ' + r.status)); }
-      });
-    },
-    saveConn: function () { saveConfig(readConn()); renderConn(); renderSettings(); toast('配置已保存'); refreshAll(true); },
-    toggleDemo: function () {
-      saveConfig({ demo: !S.cfg.demo, configured: true });
-      renderSettings(); renderConn();
-      toast(S.cfg.demo ? '已开启演示模式' : '已关闭演示模式，正在连接服务端');
-      refreshAll(true);
-    },
-    toggleNotify: function () { saveConfig({ notify: !S.cfg.notify }); renderSettings(); toast(S.cfg.notify ? '通知已开启' : '通知已关闭'); },
-    clearLog: function () { try { Native.clearLog(); } catch (e) {} renderSettings(); toast('日志已清空'); },
-    switchAccount: function (id) {
-      if (platformOf(S.scope) !== 'wb') { toast('该平台请使用桌面端切换（需写本机客户端配置）'); return; }
-      api('POST', '/api/switch', { accountId: id, region: regionOf(S.scope) })
-        .then(function () { toast('切换成功'); refreshAll(true); })
-        .catch(function (e) { toast('切换失败：' + e.message, true); });
-    },
-    remark: function (id) {
-      var a = null; S.accounts.forEach(function (x) { if (x.id === id) a = x; });
-      App.sheet('remark', { id: id, value: a ? a.remark : '' });
-    },
-    delAccount: function (id) {
-      if (!confirm('确认删除该账号？可在回收站恢复。')) return;
-      api('POST', '/api/accounts/delete', { scope: S.scope, accountId: id })
-        .then(function () { toast('已移入回收站'); loadAccounts().then(function () { renderAccounts(); renderOverview(); }); })
-        .catch(function (e) { toast('删除失败：' + e.message, true); });
-    },
-    loadTrash: function () {
-      api('GET', '/api/accounts/trash?scope=' + encodeURIComponent(S.scope))
-        .then(function (d) { S.trash = d; renderTrash(); }).catch(function (e) { toast('加载失败：' + e.message, true); });
-    },
-    restore: function (key) {
-      api('POST', '/api/accounts/trash/restore', { scope: S.scope, key: key })
-        .then(function () { toast('已恢复'); S.trash = null; loadAccounts().then(function () { renderAccounts(); $('#acTrash').innerHTML = '<div class="tiny dim">点击「查看」加载已删除的账号，可恢复。</div>'; }); })
-        .catch(function (e) { toast('恢复失败：' + e.message, true); });
-    },
-    loadCreditsFor: function (id) {
-      api('POST', '/api/credits/query', { scope: S.scope, accountId: id }).then(function (d) {
-        App.sheet('creditDetail', { data: d });
-      }).catch(function (e) { toast('查询失败：' + e.message, true); });
-    },
-    closeSheet: function () { $('#mask').classList.remove('show'); },
-    sheet: function (kind, arg) {
-      var h = '<div class="handle"></div>';
-      if (kind === 'addAccount') {
-        h += '<h2>添加账号</h2><p class="desc">扫码授权由电脑端完成，App 负责发起与轮询结果。</p>' +
-          '<label class="fld"><span>方式一 · OAuth 扫码登录</span></label>' +
-          '<button class="btn pri full" onclick="App.oauthStart()">发起登录（' + esc(scopeMeta(S.scope).name) + '）</button>' +
-          '<div id="oauthBox" class="hint" style="margin-top:10px;display:none"></div>' +
-          '<div class="line"></div>' +
-          '<label class="fld"><span>方式二 · 粘贴授权凭据</span><textarea id="credInput" rows="3" placeholder="粘贴客户端导出的凭据 JSON"></textarea></label>' +
-          '<button class="btn full" onclick="App.pasteCred()">导入凭据</button>' +
-          '<div class="hint" style="margin-top:12px">凭据仅发送给你自己填写的服务端（<code>/api/accounts/paste-credential</code>），App 不保存明文。</div>';
-      } else if (kind === 'remark') {
-        h += '<h2>修改备注</h2><p class="desc">对应 <code>/api/accounts/remark</code></p>' +
-          '<label class="fld"><span>备注内容</span><input id="remarkInput" value="' + esc(arg.value) + '" placeholder="例如：DS4.1 额度"></label>' +
-          '<button class="btn pri full" onclick="App.saveRemark(\'' + esc(arg.id) + '\')">保存</button>';
-      } else if (kind === 'creditDetail') {
-        var d = arg.data || {};
-        h += '<h2>积分详情</h2><p class="desc">/api/credits/query 实时返回</p>' +
-          '<div class="card tight"><div class="kv"><span class="k">账号</span><span>' + esc(d.accountName || d.accountId || '—') + '</span></div>' +
-          '<div class="kv"><span class="k">剩余额度</span><span style="color:var(--pri2);font-weight:700">' + fmt(d.totalRemaining) + '</span></div>' +
-          '<div class="kv"><span class="k">总额度</span><span>' + fmt(d.totalCapacity) + '</span></div>' +
-          '<div class="kv"><span class="k">即将到期</span><span>' + esc(when(d.soonestExpireAt)) + '</span></div>' +
-          '<div class="kv"><span class="k">状态</span><span>' + (d.error ? '<span class="tag err">' + esc(d.error) + '</span>' : '<span class="tag ok">正常</span>') + '</span></div></div>' +
-          '<pre class="code">' + esc(JSON.stringify(d, null, 2).slice(0, 1600)) + '</pre>';
-      } else if (kind === 'routes') {
-        h += '<h2>已适配的 API 路由</h2><p class="desc">与 dev 分支 src/lib/api.ts 的 ROUTES 表一致</p><pre class="code">' + esc(ROUTES_DOC) + '</pre>';
+    // format bits (ECL M = 0, mask 0)
+    var fdata = (0 << 3) | 0, rem = fdata;
+    for (var i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    var fbits = ((fdata << 10) | rem) ^ 0x5412;
+    for (var i = 0; i <= 5; i++) setF(8, i, getBit(fbits, i));
+    setF(8, 7, getBit(fbits, 6)); setF(8, 8, getBit(fbits, 7)); setF(7, 8, getBit(fbits, 8));
+    for (var i = 9; i < 15; i++) setF(14 - i, 8, getBit(fbits, i));
+    for (var i = 0; i < 8; i++) setF(size - 1 - i, 8, getBit(fbits, i));
+    for (var i = 8; i < 15; i++) setF(8, size - 15 + i, getBit(fbits, i));
+    setF(8, size - 8, true);
+    // version bits
+    if (v >= 7) { var vr = v; for (var i = 0; i < 12; i++) vr = (vr << 1) ^ ((vr >>> 11) * 0x1F25); var vbits = (v << 12) | vr; for (var i = 0; i < 18; i++) { var bit = getBit(vbits, i), aa = size - 11 + i % 3, bb = Math.floor(i / 3); setF(aa, bb, bit); setF(bb, aa, bit); } }
+    // data placement
+    var bi = 0;
+    for (var right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (var vert = 0; vert < size; vert++) for (var j = 0; j < 2; j++) {
+        var x = right - j, upward = ((right + 1) & 2) === 0, y = upward ? size - 1 - vert : vert;
+        if (!fx[y][x]) {
+          var dark = false;
+          if (bi < cw.length * 8) { dark = getBit(cw[bi >>> 3], 7 - (bi & 7)); bi++; }
+          if ((x + y) % 2 === 0) dark = !dark;   // mask 0（余数位同样要翻）
+          m[y][x] = dark;
+        }
       }
-      $('#sheet').innerHTML = h; $('#mask').classList.add('show');
-    },
-    oauthStart: function () {
-      var p = platformOf(S.scope);
-      var path = p === 'trae' ? '/api/trae/oauth/start' : (p === 'qoder' ? '/api/qoder/oauth/start' : '/api/oauth/start');
-      var body = p === 'qoder' ? { scope: S.scope } : { region: regionOf(S.scope) };
-      api('POST', path, body).then(function (r) {
-        var box = $('#oauthBox'); box.style.display = 'block';
-        box.innerHTML = '<b>登录已发起</b><br>loginId：<code>' + esc(r.loginId) + '</code><br>' +
-          (r.verificationUri ? '验证地址：<code>' + esc(r.verificationUri) + '</code><br>' : '') +
-          '<div style="margin-top:8px"><button class="btn sm" onclick="App.openOAuth(\'' + esc(r.verificationUri || '') + '\')">在浏览器打开</button> ' +
-          '<button class="btn sm pri" onclick="App.oauthPoll(\'' + esc(r.loginId) + '\')">检查登录结果</button></div>' +
-          '<div id="oauthState" class="tiny" style="margin-top:8px;color:var(--sub)">等待授权…</div>';
-        App._oauth = { loginId: r.loginId, platform: p };
-      }).catch(function (e) { toast('发起失败：' + e.message, true); });
-    },
-    openOAuth: function (u) { if (u) try { Native.openUrl(u); } catch (e) { window.open(u); } },
-    oauthPoll: function (loginId) {
-      var p = App._oauth ? App._oauth.platform : 'wb';
-      var path = p === 'trae' ? '/api/trae/oauth/status' : (p === 'qoder' ? '/api/qoder/oauth/status' : '/api/oauth/status');
-      api('POST', path, { loginId: loginId, region: regionOf(S.scope) }).then(function (r) {
-        var el = $('#oauthState');
-        if (!el) return;
-        if (r.done && r.result) { el.innerHTML = '<span style="color:var(--ok)">✓ 登录成功：' + esc(r.result.email || r.result.nickname || '') + '</span>'; toast('账号已添加'); refreshAll(true); }
-        else el.textContent = r.error ? ('错误：' + r.error) : '尚未完成授权，请稍后再点「检查登录结果」';
-      }).catch(function (e) { var el = $('#oauthState'); if (el) el.textContent = e.message; });
-    },
-    pasteCred: function () {
-      var v = ($('#credInput').value || '').trim();
-      if (!v) { toast('请先粘贴凭据', true); return; }
-      api('POST', '/api/accounts/paste-credential', { scope: S.scope, credential: v })
-        .then(function () { toast('导入成功'); App.closeSheet(); refreshAll(true); })
-        .catch(function (e) { toast('导入失败：' + e.message, true); });
-    },
-    saveRemark: function (id) {
-      var v = $('#remarkInput').value;
-      api('POST', '/api/accounts/remark', { scope: S.scope, accountId: id, remark: v })
-        .then(function () { toast('备注已保存'); App.closeSheet(); loadAccounts().then(renderAccounts); })
-        .catch(function (e) { toast('保存失败：' + e.message, true); });
     }
-  };
-  window.App = App;
-
-  function readConn() {
-    return {
-      scheme: $('#stScheme').value, host: ($('#stHost').value || '192.168.1.1').trim(),
-      port: n($('#stPort').value, 57890), token: $('#stToken').value.trim(), configured: true,
-      baseUrl: $('#stScheme').value + '://' + ($('#stHost').value || '192.168.1.1').trim() + ':' + n($('#stPort').value, 57890)
-    };
+    return { size: size, version: v, modules: m };
   }
+  return { build: build, chooseVersion: chooseVersion };
+})();
 
-  /* 返回键：先关弹层，再回概览，最后退出 */
-  window.__bsBack = function () {
-    if ($('#mask').classList.contains('show')) { App.closeSheet(); return '1'; }
-    if (S.page !== 'overview') { App.go('overview'); return '1'; }
-    return '0';
-  };
 
-  var ROUTES_DOC = [
-    'GET  /api/status                          状态 / 连接自检',
-    'GET  /api/accounts/list?scope=            账号列表（WorkBuddy）',
-    'GET  /api/trae/accounts                   Trae 账号列表',
-    'GET  /api/qoder/accounts?scope=           Qoder 账号列表',
-    'POST /api/credits/query                   积分查询（scope + accountId）',
-    'GET  /api/credits/stats                   积分统计',
-    'GET  /api/trae/credits                    Trae 积分',
-    'GET  /api/qoder/credits                   Qoder 积分',
-    'GET  /api/checkin/status                  批量签到状态',
-    'POST /api/checkin/status/query            单账号签到状态',
-    'POST /api/checkin                         单账号签到',
-    'POST /api/checkin/all                     WorkBuddy 全部签到',
-    'POST /api/trae/checkin                    Trae 批量签到',
-    'POST /api/qoder/checkin/claim             Qoder 领取签到',
-    'GET  /api/checkin/config                  自动签到配置',
-    'POST /api/checkin/config                  保存自动签到配置',
-    'GET  /api/checkin/logs                    签到日志',
-    'POST /api/oauth/start                     OAuth 发起登录',
-    'POST /api/oauth/status                    OAuth 轮询结果',
-    'POST /api/accounts/paste-credential       凭据导入',
-    'POST /api/switch                          切换账号',
-    'POST /api/accounts/remark                 修改备注',
-    'POST /api/accounts/delete                 删除账号',
-    'GET  /api/accounts/trash?scope=           回收站',
-    'POST /api/accounts/trash/restore          恢复账号',
-    '',
-    '来源：dev 分支 src/lib/api.ts 的 ROUTES 映射表（284 条）',
-    '服务端：crates/buddy-switch-server/src/api.rs (axum)'
-  ].join('\n');
+/* ================= 应用 ================= */
+(function(){
+'use strict';
+var HAS = !!window.BuddySwitch;
+var BROWSER = !HAS;
+var $ = function(s){ return document.querySelector(s); };
+var esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+var S = { cfg:{}, accounts:[], stats:{}, credits:{}, tab:'home', oauth:null, pollTimer:null,
+          addPlatform:'wb', addVariant:'cn', filterPlatform:'all', lastReport:null };
+var PLATFORMS=[
+  {id:'wb',label:'WorkBuddy',qr:true,growth:true,note:'手机独立扫码授权（fewards 协议）'},
+  {id:'qoder',label:'Qoder',qr:true,growth:false,note:'PKCE 设备授权，纯 HTTP 轮询，手机可独立登录'},
+  {id:'trae',label:'Trae',qr:false,growth:false,note:'上游需桌面客户端设备私钥与本地回环；粘贴 JWT 导入后即可独立签到 / 查积分'}
+];
+function platformMeta(p){ for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].id===p) return PLATFORMS[i]; return PLATFORMS[0]; }
+function platformOf(a){ return (a && a.platform) || 'wb'; }
+var pending = {}, seq = 0;
 
-  /* ---------- 启动 ---------- */
-  loadConfig();
-  renderConn(); renderScopeChips();
-  if (!S.cfg.configured && !S.cfg.demo) {
-    setTimeout(function () {
-      App.sheet('routes');
-      toast('首次使用：请在「设置」填写电脑端服务地址，或开启演示模式');
-    }, 500);
-  }
-  refreshAll(true).then(function () {
-    if (!S.cfg.demo && !S.connected) toast('未连接服务端，请检查设置或开启演示模式', true);
+/* ---------- 原生桥 ---------- */
+window.__bsCallback = function(id, ok, status, json){
+  var fn = pending[id]; if(!fn) return; delete pending[id];
+  var d = {}; try{ d = JSON.parse(json); }catch(e){}
+  fn(d);
+};
+function bridge(action, args){
+  return new Promise(function(res){
+    if(!HAS) return res(demo(action,args||{}));
+    var id='c'+(++seq); pending[id]=res;
+    try{ window.BuddySwitch.call(id, action, JSON.stringify(args||{})); }
+    catch(e){ delete pending[id]; res({ok:false,error:String(e)}); }
   });
+}
+function isNet(a){
+  return ['state','loginStart','loginPoll','loginCancel','addManual','checkin','growth',
+          'credits','creditsAll','refresh','syncPing','syncPush','syncFetch',
+          'export','importAccounts','removeAccount'].indexOf(a)>=0;
+}
+function native(action, args){
+  if(BROWSER) return Promise.resolve(demo(action,args||{}));
+  if(['setConfig','getLog','clearLog','setAutoCheckin'].indexOf(action)>=0) return bridge(action,args);
+  if(isNet(action) && S.cfg.demo) return Promise.resolve(demo(action,args||{}));
+  return bridge(action,args);
+}
+
+/* ---------- 演示模式（浏览器预览 / App 内开关） ---------- */
+var DEMO = {
+  accounts:[
+    {id:'wb_10001',label:'演示账号 · 国内版',uid:'10001',variant:'cn',variantLabel:'国内版',
+     platform:'wb',platformLabel:'WorkBuddy',scopeLabel:'WorkBuddy · 国内版',
+     tokenMask:'eyJhbGci…xQ2w',hasRefresh:true,
+     expiresAt:Math.floor(Date.now()/1000)+7200, refreshExpiresAt:Math.floor(Date.now()/1000)+2592000,
+     obtainedAt:Date.now()-3600000,enterpriseId:'',avatarUrl:'',syncVersion:0},
+    {id:'wb_ai_20002',label:'Demo Account · AI',uid:'20002',variant:'ai',variantLabel:'国际版',
+     platform:'wb',platformLabel:'WorkBuddy',scopeLabel:'WorkBuddy · 国际版',
+     tokenMask:'eyJ0eXAi…9ZkQ',hasRefresh:true,
+     expiresAt:Math.floor(Date.now()/1000)+3600, refreshExpiresAt:Math.floor(Date.now()/1000)+2592000,
+     obtainedAt:Date.now()-7200000,enterpriseId:'',avatarUrl:'',syncVersion:0},
+    {id:'qoder_cn_30003',label:'Qoder 演示账号',uid:'30003',variant:'cn',variantLabel:'国内版',
+     platform:'qoder',platformLabel:'Qoder',scopeLabel:'Qoder · 国内版',
+     tokenMask:'drt-abc…9Zx',hasRefresh:true,
+     expiresAt:Math.floor(Date.now()/1000)+7200, refreshExpiresAt:0,
+     obtainedAt:Date.now()-1800000,enterpriseId:'',avatarUrl:'',syncVersion:0},
+    {id:'trae_cn_40004',label:'Trae 演示账号',uid:'40004',variant:'cn',variantLabel:'国内版',
+     platform:'trae',platformLabel:'Trae',scopeLabel:'Trae · 国内版',
+     tokenMask:'eyJ0eXAi…TrAe',hasRefresh:false,
+     expiresAt:Math.floor(Date.now()/1000)+86400, refreshExpiresAt:0,
+     obtainedAt:Date.now()-5400000,enterpriseId:'',avatarUrl:'',syncVersion:0}
+  ],
+  poll:0, log:'',
+  sync:{host:'192.168.1.5',port:57900,code:''},
+  demo:true, autoCheckin:false, intervalMin:360, notify:true
+};
+function demoAccounts(){ return DEMO.accounts.map(function(a){
+  var o={}; for(var k in a) o[k]=a[k]; return o; }); }
+function demo(action,a){
+  var P=function(o){ return o; };
+  if(action==='state') return {ok:true,version:'2.1.0',sdk:34,demo:DEMO.demo,
+    autoCheckin:DEMO.autoCheckin,intervalMin:DEMO.intervalMin,notify:DEMO.notify,
+    sync:DEMO.sync,accounts:demoAccounts(),
+    stats:{total:DEMO.accounts.length,
+      cn:DEMO.accounts.filter(function(x){return x.variant==='cn'}).length,
+      ai:DEMO.accounts.filter(function(x){return x.variant==='ai'}).length,
+      wb:DEMO.accounts.filter(function(x){return platformOf(x)==='wb'}).length,
+      qoder:DEMO.accounts.filter(function(x){return platformOf(x)==='qoder'}).length,
+      trae:DEMO.accounts.filter(function(x){return platformOf(x)==='trae'}).length},
+    platforms:PLATFORMS.map(function(p){return {platform:p.id,label:p.label,
+      variant:'cn',qrLogin:p.qr,checkin:true,growth:p.growth,manualHint:p.note};}),
+    lastCheckin:'',lastGrowth:'',log:DEMO.log};
+  if(action==='setConfig'){
+    if(a.syncHost!==undefined) DEMO.sync.host=a.syncHost;
+    if(a.syncPort!==undefined) DEMO.sync.port=a.syncPort;
+    if(a.syncCode!==undefined) DEMO.sync.code=a.syncCode;
+    if(a.demo!==undefined) DEMO.demo=a.demo;
+    if(a.notify!==undefined) DEMO.notify=a.notify;
+    return {ok:true,message:'设置已保存（演示）'};
+  }
+  if(action==='loginStart'){ DEMO.poll=0;
+    var lv=a.variant||'cn', pf=a.platform||'wb';
+    if(pf==='trae') return {ok:false,error:'Trae 上游需要桌面客户端设备私钥，请改用「粘贴 Trae JWT」导入'};
+    var lu = pf==='qoder'
+      ? (lv==='ai'
+          ? 'https://qoder.com/device/selectAccounts?challenge=demo-challenge&nonce=demo-nonce'
+          : 'https://qoder.com.cn/device/selectAccounts?challenge=demo-challenge&nonce=demo-nonce&redirect_uri=qoder-work-cn://')
+      : (lv==='ai'
+          ? 'https://www.workbuddy.ai/v2/plugin/auth/confirm?state=demo-state-8f3c9d1e&platform=workbuddy-ai'
+          : 'https://www.codebuddy.cn/v2/plugin/auth/confirm?state=demo-state-8f3c9d1e&platform=CLI');
+    return {ok:true,state:(pf==='qoder'?'qoder_':'')+'demo-state',authUrl:lu,
+      variant:lv,platform:pf,variantLabel:(lv==='ai'?'国际版':'国内版'),
+      appLabel:(pf==='qoder'?'Qoder':(lv==='ai'?'WorkBuddy AI':'WorkBuddy')),expiresIn:300}; }
+  if(action==='loginPoll'){
+    DEMO.poll++;
+    if(DEMO.poll<3) return {ok:true,status:'pending',message:'等待扫码 / 确认授权…（演示）'};
+    var v=(a&&a.variant)||'cn', pf=(a&&a.platform)||'wb';
+    var uid='demo'+Date.now(), meta=platformMeta(pf);
+    var prefix=pf==='wb'?(v==='ai'?'wb_ai_':'wb_'):(pf+'_'+v+'_');
+    DEMO.accounts.push({id:prefix+uid,label:'新登录的 '+meta.label+' 账号',uid:uid,
+      variant:v,variantLabel:(v==='ai'?'国际版':'国内版'),platform:pf,
+      platformLabel:meta.label,scopeLabel:meta.label+' · '+(v==='ai'?'国际版':'国内版'),
+      tokenMask:'eyJhbGci…new!',
+      hasRefresh:true,expiresAt:Math.floor(Date.now()/1000)+3600,
+      refreshExpiresAt:Math.floor(Date.now()/1000)+2592000,obtainedAt:Date.now(),
+      enterpriseId:'',avatarUrl:'',syncVersion:0});
+    DEMO.log+='演示：扫码登录成功\n';
+    return {ok:true,status:'ready',account:{id:'x',label:'新登录的演示账号',variant:v}};
+  }
+  if(action==='loginCancel'||action==='removeAccount'){
+    if(action==='removeAccount') DEMO.accounts=DEMO.accounts.filter(function(x){return x.id!==a.id});
+    return {ok:true,message:'已处理（演示）'};
+  }
+  if(action==='addManual'||action==='importAccounts'){
+    var v2=a.variant||'cn', pf2=(a&&a.platform)||'wb', uid2='m'+Date.now();
+    var m2=platformMeta(pf2);
+    var pre2=pf2==='wb'?(v2==='ai'?'wb_ai_':'wb_'):(pf2+'_'+v2+'_');
+    DEMO.accounts.push({id:pre2+uid2,label:'手动导入的 '+m2.label+' 账号',uid:uid2,
+      variant:v2,variantLabel:(v2==='ai'?'国际版':'国内版'),platform:pf2,
+      platformLabel:m2.label,scopeLabel:m2.label+' · '+(v2==='ai'?'国际版':'国内版'),
+      tokenMask:'eyJhbGci…manual',
+      hasRefresh:false,expiresAt:0,refreshExpiresAt:0,obtainedAt:Date.now(),
+      enterpriseId:'',avatarUrl:'',syncVersion:0});
+    return {ok:true,count:1,message:'已导入（演示）'};
+  }
+  if(action==='checkin'||action==='growth'){
+    var pick=(a&&a.ids&&a.ids.length)?DEMO.accounts.filter(function(x){return a.ids.indexOf(x.id)>=0}):DEMO.accounts;
+    var items=pick.map(function(x){
+      var pf=platformOf(x), skip=false, detail='';
+      if(action==='checkin'){
+        skip=(pf==='wb' && x.variant==='ai');
+        detail=skip?'WorkBuddy 国际版暂无签到接口，已跳过'
+          :(pf==='qoder'?'Qoder 每日签到完成，+100 Credits'
+          :(pf==='trae'?'Trae 签到领积分完成，+150 Credits':'领取成功 +10 积分，连签 7 天'));
+        var r={ok:true,already:false,skipped:skip,detail:detail};
+      } else {
+        skip=(pf!=='wb' || x.variant==='ai');
+        detail=skip?(pf==='wb'?'国际版暂无成长中心，已跳过':'该平台没有成长中心，签到即领积分')
+                   :'领取完成：成功 4 项，累计 +35 积分';
+        r={ok:true,skipped:skip,creditsGained:skip?0:35,report:detail,
+           parts:skip?[]:['已接单「每日浏览」','领任务奖「签到」+10 积分','Buddy 旅行礼物 +25 积分']};
+      }
+      return {id:x.id,label:x.label,variant:x.variant,variantLabel:x.variantLabel,
+        platform:pf,platformLabel:x.platformLabel||'WorkBuddy',result:r};
+    });
+    DEMO.log+='演示：'+(action==='checkin'?'签到':'成长领取')+'完成\n';
+    return {ok:true,items:items,okCount:items.length,failCount:0,at:Date.now()};
+  }
+  if(action==='credits'||action==='creditsAll'){
+    var cr={ok:true,total:2000,remaining:1360,used:640,unit:'credits',
+      packages:[{name:'月度赠送包',code:'FREE_MONTHLY',total:1000,remaining:360,used:640,
+                 expireAt:Date.now()+12*86400000},
+                {name:'体验包',code:'TRIAL',total:1000,remaining:1000,used:0,expireAt:0}],
+      expireAt:Date.now()+12*86400000,variant:'cn'};
+    if(action==='creditsAll') return {ok:true,okCount:DEMO.accounts.length,failCount:0,
+      items:DEMO.accounts.map(function(x){return {id:x.id,label:x.label,
+        platform:platformOf(x),platformLabel:x.platformLabel||'WorkBuddy',result:cr};})};
+    return cr;
+  }
+  if(action==='refresh') return {ok:true,message:'凭据已刷新（演示）'};
+  if(action==='syncPing') return {ok:true,paired:true,message:'电脑端在线（演示）'};
+  if(action==='syncPush') return {ok:true,results:[],message:'已推送 '+DEMO.accounts.length+' 个账号（演示）'};
+  if(action==='syncFetch') return {ok:true,added:1,updated:0,skipped:2,message:'从电脑同步：新建 1，补凭据 0，跳过 2（演示）'};
+  if(action==='export') return {ok:true,json:JSON.stringify(DEMO.accounts.map(function(x){
+    return {uid:x.uid,label:x.label,token:'DEMO_TOKEN_'+x.uid,variant:x.variant};}),null,2)};
+  if(action==='getLog') return {ok:true,log:DEMO.log};
+  if(action==='clearLog'){ DEMO.log=''; return {ok:true}; }
+  if(action==='setAutoCheckin'){ DEMO.autoCheckin=a.enabled; return {ok:true}; }
+  return {ok:true};
+}
+
+/* ---------- 通用 UI ---------- */
+var toastTimer;
+function toast(msg,bad){
+  var t=$('#toast'); t.textContent=msg; t.className='on'+(bad?' bad':'');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.className='';},2600);
+}
+function fmtTime(sec){
+  if(!sec||sec<=0) return '未知';
+  var d=new Date(sec*1000);
+  var pad=function(n){return n<10?'0'+n:''+n};
+  return (d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function fmtExp(sec){
+  if(!sec||sec<=0) return '未知';
+  var h=(sec*1000-Date.now())/3600000;
+  if(h<=0) return fmtTime(sec)+'（已过期）';
+  return fmtTime(sec)+'（剩 '+(h<48?h.toFixed(1)+' 小时':(h/24).toFixed(1)+' 天')+'）';
+}
+function credHealth(a){
+  var usable=a.expiresAt>0 ? a.expiresAt*1000>Date.now() : true;
+  if(!usable && a.hasRefresh) return {t:'access 已过期，可用 refresh 刷新',c:'tag-warn'};
+  if(!usable) return {t:'凭据已失效，请重新扫码',c:'tag-err'};
+  return {t:'凭据有效',c:'tag-ok'};
+}
+function avatarColor(id){
+  var h=0; for(var i=0;i<String(id).length;i++) h=(h*31+id.charCodeAt(i))%360;
+  return 'hsl('+h+',58%,48%)';
+}
+
+/* ---------- 导航 ---------- */
+var ICONS={
+ home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
+ accounts:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.5a3 3 0 0 1 0 5.6"/><path d="M18 14.5c2 .8 3 2.6 3 5"/>',
+ sync:'<path d="M4 7h12l-3-3"/><path d="M20 17H8l3 3"/><path d="M4 7a8 8 0 0 1 13-2"/><path d="M20 17a8 8 0 0 1-13 2"/>',
+ settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'
+};
+var TABS=[['home','首页'],['accounts','账号'],['sync','同步'],['settings','设置']];
+function renderNav(){
+  $('#nav').innerHTML=TABS.map(function(t){
+    return '<button class="'+(S.tab===t[0]?'on':'')+'" onclick="App.tab(\''+t[0]+'\')">'+
+      '<svg viewBox="0 0 24 24">'+ICONS[t[0]]+'</svg><span>'+t[1]+'</span></button>';
+  }).join('');
+}
+function setTab(t){
+  S.tab=t;
+  ['home','accounts','sync','settings'].forEach(function(k){
+    var el=$('#v-'+k); if(el) el.className='view'+(k===t?' on':'');
+  });
+  renderNav(); $('#sc').scrollTop=0;
+  if(t==='settings') loadLog();
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  var st=S.stats||{};
+  var ac=S.accounts||[];
+  function pcount(p){return ac.filter(function(x){return platformOf(x)===p}).length;}
+  $('#sTotal').textContent=st.total||0;
+  $('#sWb').textContent=st.wb!==undefined?st.wb:pcount('wb');
+  $('#sQoder').textContent=st.qoder!==undefined?st.qoder:pcount('qoder');
+  $('#sTrae').textContent=st.trae!==undefined?st.trae:pcount('trae');
+  var sum=null;
+  Object.keys(S.credits).forEach(function(k){
+    var c=S.credits[k]; if(c&&c.ok&&typeof c.remaining==='number') sum=(sum||0)+c.remaining;
+  });
+  $('#sCredits').textContent=sum==null?'—':Math.round(sum);
+  $('#hdBadge').className='badge'+(S.cfg.demo?' demo':'');
+  $('#hdBadge').textContent=S.cfg.demo?'演示模式':'本机独立运行';
+  $('#verText').textContent='2.1.0'+(BROWSER?' · 浏览器预览':'');
+  $('#swAuto').checked=!!S.cfg.autoCheckin;
+  $('#swNotify').checked=!!S.cfg.notify;
+  $('#swDemo').checked=!!S.cfg.demo;
+  $('#intervalMin').value=S.cfg.intervalMin||360;
+  $('#syncHost').value=(S.cfg.sync&&S.cfg.sync.host)||'';
+  $('#syncPort').value=(S.cfg.sync&&S.cfg.sync.port)||57900;
+  $('#syncCode').value=(S.cfg.sync&&S.cfg.sync.code)||'';
+  renderAccounts(); renderHomeResult();
+}
+function renderAccounts(){
+  var f=S.filterPlatform||'all';
+  var ids={all:'fAll',wb:'fWb',qoder:'fQoder',trae:'fTrae'};
+  Object.keys(ids).forEach(function(k){
+    var el=$('#'+ids[k]); if(el) el.className=(f===k?'on':'');
+  });
+  var list=S.accounts||[];
+  var visible=(f==='all')?list:list.filter(function(a){return platformOf(a)===f;});
+  if(!visible.length){
+    $('#accList').innerHTML='<div class="empty"><div class="ic">☺</div>'+
+      '<p>'+(list.length?'该平台下还没有账号':'本机还没有账号')+
+      '<br>点上方「＋ 添加账号」按平台登录或粘贴凭据</p></div>';
+    return;
+  }
+  var html='';
+  PLATFORMS.forEach(function(p){
+    var arr=visible.filter(function(a){return platformOf(a)===p.id;});
+    if(!arr.length) return;
+    html+='<div class="sec-t">'+esc(p.label)+' <span class="r">'+arr.length+' 个</span></div>';
+    arr.forEach(function(a){ html+=accCard(a); });
+  });
+  $('#accList').innerHTML=html;
+}
+function accCard(a){
+  var h=credHealth(a), c=S.credits[a.id];
+  var credHtml='';
+  if(c&&c.ok){
+    var pct=c.total>0?Math.max(0,Math.min(100,c.remaining/c.total*100)):0;
+    credHtml='<div class="cred-box"><div class="cred-n"><b>'+Math.round(c.remaining)+
+      '</b><span>/ '+Math.round(c.total)+' '+(c.unit||'credits')+' 剩余</span></div>'+
+      '<div class="bar"><i style="width:'+pct.toFixed(1)+'%"></i></div>'+
+      (c.expireAt?'<div class="kv" style="margin-top:7px"><span>最近到期</span><b>'+fmtTime(Math.floor(c.expireAt/1000))+'</b></div>':'')+
+      '</div>';
+  } else if(c&&c.error){
+    credHtml='<div class="cred-box"><span class="tag-err tiny">积分查询失败：'+esc(c.error)+'</span></div>';
+  }
+  return '<div class="acc">'+
+    '<div class="acc-h"><div class="av" style="background:'+avatarColor(a.id)+'">'+
+      esc((a.label||'?').trim().charAt(0).toUpperCase())+'</div>'+
+      '<div style="flex:1;min-width:0"><div class="acc-n">'+esc(a.label||'未命名')+
+        '<span style="display:inline-block;margin-right:5px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(99,102,241,.18);color:#a5b4fc;vertical-align:middle">'+esc(a.platformLabel||'WorkBuddy')+'</span>'+
+        '<span class="vtag '+(a.variant==='ai'?'ai':'')+'">'+esc(a.variantLabel||'国内版')+'</span></div>'+
+      '<div class="acc-m">uid '+esc(a.uid||'（无）')+' · '+esc(a.tokenMask||'')+'</div></div></div>'+
+    '<div style="margin-top:10px">'+
+      '<div class="kv"><span>access 到期</span><b>'+fmtExp(a.expiresAt)+'</b></div>'+
+      '<div class="kv"><span>refresh 到期</span><b>'+fmtExp(a.refreshExpiresAt)+'</b></div>'+
+      '<div class="kv"><span>状态</span><b class="'+h.c+'">'+h.t+'</b></div>'+
+    '</div>'+ credHtml +
+    '<div class="acc-acts">'+
+      '<button class="btn sm" onclick="App.credits(\''+esc(a.id)+'\')">查积分</button>'+
+      '<button class="btn sm" onclick="App.checkinOne(\''+esc(a.id)+'\')">签到</button>'+
+      '<button class="btn sm" onclick="App.growthOne(\''+esc(a.id)+'\')">领积分</button>'+
+      '<button class="btn sm" onclick="App.refresh(\''+esc(a.id)+'\')">刷新凭据</button>'+
+      '<button class="btn sm dan" onclick="App.remove(\''+esc(a.id)+'\')">删除</button>'+
+    '</div></div>';
+}
+function renderHomeResult(){
+  var r=S.lastReport;
+  if(!r){ return; }
+  var when=r.at?new Date(r.at).toLocaleString('zh-CN',{hour12:false}):'';
+  $('#lastAt').textContent=when;
+  var items=r.items||[];
+  var html=items.map(function(it){
+    var x=it.result||{}, ok=x.ok||x.skipped, cls=ok?'tag-ok':'tag-err';
+    var detail=x.detail||x.report||x.message||x.error||'';
+    var extra='';
+    if(x.parts&&x.parts.length) extra=x.parts.map(function(p){return '· '+esc(p);}).join('<br>');
+    return '<div class="item"><div class="dot" style="background:'+(ok?'var(--ok)':'var(--err)')+'"></div>'+
+      '<div class="tx"><b>'+esc(it.label||it.id)+'</b> <span class="'+cls+'">'+
+      (x.skipped?'跳过':(ok?'成功':'失败'))+'</span><small>'+esc(detail)+
+      (extra?'<br>'+extra:'')+'</small></div></div>';
+  }).join('');
+  $('#homeResult').innerHTML=html||'<div class="hint">无结果</div>';
+}
+function loadLog(){
+  native('getLog').then(function(r){
+    $('#logBox').textContent=r.log?r.log:'（暂无日志）';
+  });
+}
+
+/* ---------- 数据加载 ---------- */
+function reload(){
+  return native('state').then(function(st){
+    if(!st||st.ok===false){ toast((st&&st.error)||'读取状态失败',true); return; }
+    S.cfg=st; S.accounts=st.accounts||[]; S.stats=st.stats||{};
+    render();
+    if(st.lastCheckin){ try{ var r=JSON.parse(st.lastCheckin);
+      S.lastReport={at:r.at,items:(r.items||[]).map(function(i){
+        return {id:i.id,label:i.label,result:i.result};})}; renderHomeResult(); }catch(e){} }
+    if(S.accounts.length && !Object.keys(S.credits).length) refreshCredits(true);
+  });
+}
+function refreshCredits(silent){
+  return native('creditsAll').then(function(r){
+    if(!r||!r.items) return;
+    r.items.forEach(function(it){
+      S.credits[it.id]=it.result||{};
+    });
+    render();
+    if(!silent) toast('积分已刷新');
+  });
+}
+
+/* ---------- 弹窗 ---------- */
+function sheet(kind){
+  S.sheet=kind; var h='';
+  if(kind==='addAccount'){
+    var pf=S.addPlatform, v=S.addVariant, meta=platformMeta(pf);
+    var ph = pf==='trae' ? '粘贴 Trae JWT（可带 Cloud-IDE-JWT 前缀）'
+           : (pf==='qoder' ? '粘贴 Qoder access token / PAT'
+                           : '粘贴 JWT；也可粘贴 [{uid,label,token,variant}] 批量导入');
+    var credLabel = pf==='trae' ? 'Trae JWT'
+                  : (pf==='qoder' ? 'Qoder access token / PAT' : 'access_token 或凭据 JSON');
+    h+='<h2>添加账号</h2><p class="desc">凭据只存这台手机，签到与领取直连各平台官方接口，不需要电脑。</p>'+
+      '<div class="seg">'+PLATFORMS.map(function(p){
+        return '<button id="p'+p.id+'" class="'+(pf===p.id?'on':'')+'" onclick="App.setPlatform(\''+p.id+'\')">'+p.label+'</button>';
+      }).join('')+'</div>'+
+      '<div class="seg"><button id="segCn" class="'+(v==='cn'?'on':'')+'" onclick="App.setVariant(\'cn\')">国内版</button>'+
+      '<button id="segAi" class="'+(v==='ai'?'on':'')+'" onclick="App.setVariant(\'ai\')">国际版</button></div>'+
+      '<div class="hint" style="margin-top:0">'+esc(meta.note)+
+      (v==='ai' && pf==='wb' ? '<br><span style="color:var(--warn)">WorkBuddy 国际版暂无签到 / 成长中心接口，可登录与查积分，签到会自动跳过。</span>' : '')+
+      (pf==='trae' ? '<br><span style="color:var(--warn)">Trae 的签到 / 积分接口只需 JWT + 自造设备头：导入后可长期独立签到、领积分、查余额。</span>' : '')+
+      '</div><div class="line"></div>'+
+      (meta.qr
+        ? '<div class="sec-t">方式一 · 扫码授权登录</div>'+
+          '<button id="btnOauth" class="btn pri full" onclick="App.oauthStart()">发起登录（'+esc(meta.label)+' · '+(v==='ai'?'国际版':'国内版')+'）</button>'+
+          '<div id="oauthBox"></div><div class="line"></div>'
+        : '<div class="hint" style="margin-bottom:10px">Trae 无法在手机上独立扫码（上游设备身份限制），直接用下方方式二导入 JWT 即可。</div>')+
+      '<div class="sec-t">方式二 · 粘贴凭据</div>'+
+      '<label class="fld"><span>'+credLabel+'</span>'+
+      '<textarea id="credInput" rows="3" placeholder="'+esc(ph)+'"></textarea></label>'+
+      '<button class="btn full" style="margin-top:9px" onclick="App.pasteCred()">导入到本机</button>'+
+      '<div class="hint">不经过任何第三方。手动导入的账号若凭据过期，重新粘贴一次即可。</div>';
+  } else if(kind==='import'){
+    h+='<h2>粘贴导入账号</h2><p class="desc">支持单个对象或数组，字段：uid / label / token / refreshToken / variant。</p>'+
+      '<label class="fld"><textarea id="importInput" rows="6" placeholder=\'[{"uid":"...","label":"...","token":"eyJ..."}]\'></textarea></label>'+
+      '<button class="btn pri full" style="margin-top:10px" onclick="App.doImport()">导入</button>';
+  } else if(kind==='export'){
+    h+='<h2>导出账号</h2><p class="desc">以下是明文凭据，请自行保管，不要发给他人。</p>'+
+      '<label class="fld"><textarea id="exportBox" rows="9"></textarea></label>'+
+      '<div class="btn-row" style="margin-top:10px"><button class="btn sm" onclick="App.copyText(\'exportBox\')">复制</button>'+
+      '<button class="btn sm" onclick="App.closeSheet()">关闭</button></div>';
+  } else if(kind==='report'){
+    h+='<h2>执行结果</h2><div id="reportBox"></div>'+
+      '<button class="btn full" style="margin-top:12px" onclick="App.closeSheet()">关闭</button>';
+  }
+  $('#sheetBody').innerHTML=h;
+  $('#sheet').className='on';
+  if(kind==='export') native('export').then(function(r){
+    var el=$('#exportBox'); if(el) el.value=r.json||r.error||'';
+  });
+  if(kind==='report'){
+    var r=S.lastReport; var el=$('#reportBox');
+    if(el&&r){
+      el.innerHTML=(r.items||[]).map(function(it){
+        var x=it.result||{},ok=x.ok||x.skipped;
+        var parts=(x.parts||[]).map(function(p){return '<div class="hint" style="margin:2px 0">· '+esc(p)+'</div>';}).join('');
+        return '<div class="item"><div class="dot" style="background:'+(ok?'var(--ok)':'var(--err)')+'"></div>'+
+          '<div class="tx"><b>'+esc(it.label||it.id)+'</b> <span class="'+(ok?'tag-ok':'tag-err')+'">'+
+          (x.skipped?'跳过':(ok?'成功':'失败'))+'</span><small>'+esc(x.detail||x.report||x.error||'')+'</small>'+parts+'</div></div>';
+      }).join('');
+    }
+  }
+}
+function closeSheet(){
+  $('#sheet').className=''; S.sheet=null;
+  if(S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer=null; }
+  if(S.oauth){ native('loginCancel',{state:S.oauth.state}); S.oauth=null; }
+}
+
+/* ---------- 二维码 ---------- */
+function drawQr(canvas,text){
+  var r=QR.build(text);
+  if(!r){ canvas.width=canvas.height=120; var c=canvas.getContext('2d');
+    c.fillStyle='#fff';c.fillRect(0,0,120,120);c.fillStyle='#000';c.font='12px sans-serif';
+    c.fillText('内容过长',10,60); return; }
+  var quiet=4, mod=4, px=(r.size+quiet*2)*mod;
+  canvas.width=px; canvas.height=px;
+  var c=canvas.getContext('2d');
+  c.fillStyle='#fff'; c.fillRect(0,0,px,px);
+  c.fillStyle='#000';
+  for(var y=0;y<r.size;y++) for(var x=0;x<r.size;x++){
+    if(r.modules[y][x]) c.fillRect((x+quiet)*mod,(y+quiet)*mod,mod,mod);
+  }
+}
+
+/* ---------- App 动作 ---------- */
+var App={
+  tab:setTab,
+  sheet:sheet,
+  closeSheet:closeSheet,
+  setVariant:function(v){ S.addVariant=v; sheet('addAccount'); },  // 重建弹窗即可，避免未打开时取到 null
+  setPlatform:function(p){ S.addPlatform=p; sheet('addAccount'); },
+  setFilter:function(f){ S.filterPlatform=f; renderAccounts(); },
+  oauthStart:function(){
+    if(!platformMeta(S.addPlatform).qr){ toast('Trae 请用「粘贴 Trae JWT」导入',true); return; }
+    var btn=$('#btnOauth');
+    if(btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span> 正在发起…'; }
+    native('loginStart',{platform:S.addPlatform,variant:S.addVariant}).then(function(r){
+      if(btn){ btn.disabled=false; btn.textContent='重新发起登录'; }
+      if(!r||!r.ok){ toast((r&&r.error)||'发起失败',true); return; }
+      S.oauth={state:r.state,variant:r.variant,platform:S.addPlatform,
+               url:r.authUrl,startedAt:Date.now()};
+      var box=$('#oauthBox');
+      box.innerHTML='<div class="qr-wrap"><canvas id="qrCanvas"></canvas></div>'+
+        '<div class="qr-state" id="qrState">二维码已生成 · 用手机浏览器打开授权页，或让另一台设备扫码</div>'+
+        '<div class="btn-row" style="justify-content:center;margin-top:6px">'+
+          '<button class="btn sm pri" onclick="App.openAuth()">打开授权页</button>'+
+          '<button class="btn sm" onclick="App.copyAuth()">复制链接</button>'+
+          '<button class="btn sm" onclick="App.oauthCheck()">检查结果</button>'+
+          '<button class="btn sm dan" onclick="App.oauthCancel()">取消</button></div>'+
+        '<div class="url-box" id="authUrl">'+esc(r.authUrl)+'</div>'+
+        '<div class="hint">在手机浏览器打开授权页完成确认后回到这里，'+
+        'App 每 2 秒自动查询一次（5 分钟有效）。也可把二维码给另一台设备扫。</div>';
+      try{ drawQr($('#qrCanvas'),r.authUrl); }catch(e){}
+      if(S.pollTimer) clearInterval(S.pollTimer);
+      S.pollTimer=setInterval(function(){ App.oauthCheck(true); },2000);
+    });
+  },
+  openAuth:function(){
+    if(!S.oauth) return;
+    var u=S.oauth.url;
+    if(HAS && window.BuddySwitch.openUrl) window.BuddySwitch.openUrl(u);
+    else window.open(u,'_blank');
+  },
+  copyAuth:function(){ App.copyTextRaw(S.oauth?S.oauth.url:''); },
+  copyText:function(id){ var el=document.getElementById(id); if(el) App.copyTextRaw(el.value); },
+  copyTextRaw:function(t){
+    if(!t){ toast('没有可复制的内容',true); return; }
+    try{
+      var ta=document.createElement('textarea'); ta.value=t;
+      ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+      ta.select(); ta.setSelectionRange(0,t.length);
+      var ok=document.execCommand('copy'); document.body.removeChild(ta);
+      toast(ok?'已复制到剪贴板':'请长按上方链接手动复制',!ok);
+    }catch(e){ toast('请长按上方链接手动复制',true); }
+  },
+  oauthCheck:function(auto){
+    if(!S.oauth) return;
+    if(Date.now()-S.oauth.startedAt>300000){
+      App.oauthCancel('二维码已过期，请重新发起'); return;
+    }
+    native('loginPoll',{state:S.oauth.state,variant:S.oauth.variant,
+                         platform:S.oauth.platform||'wb'}).then(function(r){
+      var el=$('#qrState'); if(!el) return;
+      if(!r||r.status==='pending'){ el.textContent=r&&r.message?r.message:'等待授权…'; return; }
+      if(r.status==='expired'){
+        App.oauthCancel(r.message||'二维码已过期'); return;
+      }
+      if(r.status==='ready'){
+        if(S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer=null; }
+        el.innerHTML='<span class="tag-ok">✓ 登录成功，账号已存入本机</span>';
+        toast('登录成功，账号已添加');
+        S.oauth=null;
+        setTimeout(function(){ closeSheet(); reload(); },900);
+      }
+      if(r&&r.error){ el.innerHTML='<span class="tag-err">'+esc(r.error)+'</span>'; }
+    });
+  },
+  oauthCancel:function(msg){
+    if(S.pollTimer){ clearInterval(S.pollTimer); S.pollTimer=null; }
+    if(S.oauth){ native('loginCancel',{state:S.oauth.state}); S.oauth=null; }
+    var box=$('#oauthBox'); if(box) box.innerHTML='<div class="hint">'+esc(msg||'已取消登录')+'</div>';
+    if(msg) toast(msg,true);
+  },
+  pasteCred:function(){
+    var v=($('#credInput').value||'').trim();
+    if(!v){ toast('请先粘贴凭据',true); return; }
+    native('addManual',{platform:S.addPlatform,variant:S.addVariant,text:v}).then(function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'导入失败',true); return; }
+      toast('已导入 '+(r.count||1)+' 个账号'); closeSheet(); reload();
+    });
+  },
+  doImport:function(){
+    var v=($('#importInput').value||'').trim();
+    if(!v){ toast('请先粘贴内容',true); return; }
+    native('importAccounts',{text:v}).then(function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'导入失败',true); return; }
+      toast(r.message||'导入成功'); closeSheet(); reload();
+    });
+  },
+  remove:function(id){
+    if(!confirm('确定删除这个本机账号？')) return;
+    native('removeAccount',{id:id}).then(function(r){
+      toast(r&&r.ok?'已删除':'删除失败',!r||!r.ok); reload();
+    });
+  },
+  runAll:function(){
+    toast('正在签到并领取…');
+    native('checkin',{}).then(function(a){
+      return native('growth',{}).then(function(b){ return [a,b]; });
+    }).then(function(rs){
+      var a=rs[0]||{},b=rs[1]||{};
+      var items=(a.items||[]).map(function(it,i){
+        var g=(b.items||[])[i];
+        var x=it.result||{};
+        var gx=g?g.result||{}:{};
+        var parts=(gx.parts||[]).slice(0,4);
+        if(gx.creditsGained) parts.push('本次成长中心累计 +'+gx.creditsGained+' 积分');
+        return {id:it.id,label:it.label,result:{
+          ok:x.ok&&(gx.ok||gx.skipped),skipped:x.skipped&&gx.skipped,
+          detail:(x.detail||'')+(gx.report?' · '+gx.report:''),parts:parts}};
+      });
+      S.lastReport={at:Date.now(),items:items};
+      renderHomeResult(); sheet('report');
+      toast('执行完成'); reload();
+    }).catch(function(e){ toast('执行失败：'+e,true); });
+  },
+  checkinOne:function(id){
+    toast('签到中…');
+    native('checkin',{ids:[id]}).then(function(r){
+      var it=(r.items||[])[0], x=it?it.result||{}:{};
+      S.lastReport={at:Date.now(),items:[{id:id,label:it?it.label:'',result:x}]};
+      renderHomeResult(); sheet('report'); reload();
+    });
+  },
+  growthOne:function(id){
+    toast('领取成长积分中…');
+    native('growth',{ids:[id]}).then(function(r){
+      var it=(r.items||[])[0], x=it?it.result||{}:{};
+      S.lastReport={at:Date.now(),items:[{id:id,label:it?it.label:'',result:x}]};
+      renderHomeResult(); sheet('report'); reload();
+    });
+  },
+  credits:function(id){
+    toast('查询积分…');
+    native('credits',{id:id}).then(function(r){
+      if(r&&r.ok){ S.credits[id]=r; render(); toast('积分已更新'); }
+      else toast((r&&(r.error||'查询失败'))||'查询失败',true);
+    });
+  },
+  refresh:function(id){
+    toast('刷新凭据…');
+    native('refresh',{id:id}).then(function(r){
+      toast((r&&r.message)||(r&&r.error)||'完成',!r||!r.ok);
+      if(r&&r.ok) reload();
+    });
+  },
+  saveSync:function(){
+    var p={syncHost:$('#syncHost').value.trim(),syncPort:parseInt($('#syncPort').value,10)||57900,
+           syncCode:$('#syncCode').value.trim()};
+    S.cfg.sync={host:p.syncHost,port:p.syncPort,code:p.syncCode};
+    native('setConfig',p).then(function(){ toast('同步设置已保存'); });
+  },
+  syncTest:function(){
+    App.saveSync();
+    var el=$('#syncTestResult'); el.textContent='正在探测…';
+    native('syncPing',{host:$('#syncHost').value.trim(),
+      port:parseInt($('#syncPort').value,10)||57900,code:$('#syncCode').value.trim()})
+      .then(function(r){
+        el.innerHTML=r&&r.ok?'<span class="tag-ok">✓ '+esc(r.message)+'</span>'
+          :'<span class="tag-err">✗ '+esc((r&&(r.error||r.message))||'连接失败')+'</span>';
+      });
+  },
+  syncPush:function(){
+    var p=syncArgs();
+    toast('正在推送…');
+    native('syncPush',p).then(function(r){
+      toast((r&&r.message)||(r&&r.error)||'完成',!r||!r.ok);
+      if(r&&!r.ok&&r.error) alert(r.error);
+    });
+  },
+  syncFetch:function(){
+    toast('正在从电脑同步…');
+    native('syncFetch',syncArgs()).then(function(r){
+      toast((r&&r.message)||(r&&r.error)||'完成',!r||!r.ok);
+      if(r&&!r.ok&&r.error) alert(r.error);
+      reload();
+    });
+  },
+  exportAccounts:function(){ sheet('export'); },
+  toggleAuto:function(v){
+    native('setAutoCheckin',{enabled:v,intervalMin:S.cfg.intervalMin||360})
+      .then(function(r){ S.cfg.autoCheckin=v; toast(v?'自动签到已开启':'自动签到已关闭'); });
+  },
+  saveInterval:function(v){
+    var n=Math.max(15,parseInt(v,10)||360);
+    native('setConfig',{intervalMin:n}).then(function(){ S.cfg.intervalMin=n; toast('间隔已保存'); });
+  },
+  saveBool:function(k,v){
+    var p={}; p[k]=v; S.cfg[k]=v;
+    native('setConfig',p).then(function(){
+      if(k==='demo'){ closeSheet(); reload(); toast(v?'已进入演示模式':'已退出演示模式'); }
+      else toast('已保存');
+    });
+  },
+  clearLog:function(){ native('clearLog').then(function(){ $('#logBox').textContent='（暂无日志）'; }); }
+};
+function syncArgs(){
+  return {host:$('#syncHost').value.trim(),port:parseInt($('#syncPort').value,10)||57900,
+          code:$('#syncCode').value.trim()};
+}
+window.App=App;
+window.__bsBack=function(){
+  if($('#sheet').className==='on'){ closeSheet(); return true; }
+  if(S.tab!=='home'){ setTab('home'); return true; }
+  return false;
+};
+
+/* ---------- 启动 ---------- */
+renderNav();
+reload();
 })();
 </script>
 </body>

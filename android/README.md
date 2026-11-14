@@ -1,139 +1,123 @@
-# Buddy Switch Agent（Android 移动端）
+# Buddy Switch Agent（Android · 三平台独立版 v2.1）
 
-把 `dev` 分支桌面端的**积分查看 / 自动签到 / 账号登录 / 账号管理**搬到手机上的 Android 客户端。
-产物是一个真实可安装的 APK：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34）。
+**手机独立完成 WorkBuddy / Qoder / Trae 的登录、签到、领积分、查余额；账号信息同步到电脑是可选的。**
 
-> 本目录由 `dev` 分支的 `src/lib/api.ts`（ROUTES 表）与 `crates/buddy-switch-server/src/api_guard.rs`
-> 的真实契约推导而来，不是重新发明一套接口。
+产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 5 / 2.1.0）。
 
----
+> ### 版本沿革
+>
+> - **v1.x**：`buddy-switch-server` 的局域网客户端，登录/签到都靠电脑执行（已废弃）。
+> - **v2.0**：参考 [fewards](https://github.com/loma18/fewards) + [workbuddy-console](https://github.com/loma18/workbuddy-console)，
+>   改用 WorkBuddy 官方 `/v2/plugin/auth/*` 扫码协议，手机独立登录与签到。
+> - **v2.1（本次）**：新增 **Qoder 独立扫码登录** 与 **Trae 粘贴 JWT 后独立签到**，
+>   协议取自 `qoder-trae-workbuddy-switch` dev 分支的 Rust core。详见
+>   [docs/API-CONTRACT.md](docs/API-CONTRACT.md) 与 [docs/PC-TO-MOBILE.md](docs/PC-TO-MOBILE.md)。
 
-## 1. 为什么是「远程控制台」而不是把桌面端直接编译成 APK
+## 能做什么
 
-桌面端是 **Tauri（Rust 核心 + React 前端）**，核心能力建立在「本机」之上：
+| 功能 | WorkBuddy | Qoder | Trae | 需要电脑 |
+|:--|:--:|:--:|:--:|:--:|
+| 手机独立扫码登录 | ✅ | ✅ | ❌ 见下方说明 | ❌ |
+| 粘贴凭据 / JWT 导入 | ✅ | ✅ | ✅ | ❌ |
+| 每日签到领积分 | ✅ 仅国内版 | ✅ | ✅ | ❌ |
+| 成长中心一键领取 | ✅ 仅国内版 | — 签到即领 | — 签到即领 | ❌ |
+| 积分余额与到期查询 | ✅ | ✅ | ✅ | ❌ |
+| 定时自动签到 + 通知 | ✅ | ✅ | ✅ | ❌ |
+| 刷新凭据 | ✅ | 重贴 token | 重贴 JWT | ❌ |
+| **账号同步到电脑** | ✅ 可选 | ✅ 可选 | ✅ 可选 | 仅此手动动作 |
 
-| 依赖 | 桌面端做法 | Android 上 |
-|:--|:--|:--|
-| 读写客户端认证数据 | 直接操作 `~/.buddy-switch/`、WorkBuddy / Trae / Qoder 客户端配置文件 | 无这些路径，且沙箱禁止跨应用读写 |
-| 切换当前登录账号 | 改写本机 auth 文件、重启客户端进程 | 无对应客户端进程 |
-| VS Code / JetBrains / CLI 注入 | 安装插件、patch `settings.json` | 无桌面 IDE |
-| 额度网关 | 在 `57891~57895` 监听端口，暴露 OpenAI / Anthropic 兼容接口 | 手机不适合常驻监听，且会被系统冻结 |
-| 会话副本 / 记忆合并 | 读写本地 JSONL、MEMORY.md | 无本地数据源 |
+### Trae 为什么不能独立扫码
 
-这些功能**无法在手机上实现**，任何声称「完整移植」的方案都只能是假界面。
+`trae/oauth.rs` 的授权 URL 必须携带从桌面客户端 `storage.json` 解密出的
+`privateKeyPEM` / `deviceId`（`icube::device_identity_for`），且授权页会主动探测
+`127.0.0.1:17388` 确认客户端在线。两者在手机上都不存在，上游不通过。
 
-好消息是：仓库里已经有 `buddy-switch-server` —— 一个 axum HTTP 服务（`buddy-switch serve`，
-默认 `127.0.0.1:57890`），桌面端前端 `api.ts` 本来就是**双通道**（Tauri IPC / HTTP `/api/*`）。
-因此最忠实、且唯一真实成立的移动端形态是：
+但 `trae/credits.rs` 与 `trae/checkin.rs` 证明：**签到与积分接口只校验 JWT + 本机自造的
+设备请求头**（`device::derive(user_id)`）。因此从桌面客户端导出一次 JWT 后，
+手机即可长期独立签到、领积分、查余额，不再依赖电脑。JWT 的 `data.id` 会自动解析成 uid。
+
+## 快速开始
+
+1. 安装 `dist/agent.apk`（需允许「未知来源」；v2.0.0 起可直接覆盖升级，不必卸载）。
+2. 「账号」→ **＋ 添加账号** → 选平台 → 选国内版 / 国际版。
+3. WorkBuddy / Qoder：点**发起登录** → 手机浏览器打开授权页确认 → 回 App 自动轮询完成。
+   Trae：在**方式二**粘贴 `Cloud-IDE-JWT …`（可带前缀）→ 导入。
+4. 首页点 **一键签到并领取积分**，或账号页逐个操作、按平台筛选。
+
+> WorkBuddy 国际版**没有签到 / 成长中心接口**，可登录与查积分，签到自动跳过。
+> Qoder / Trae 的「领积分」不单独存在，签到本身即发放 Credits。
+
+**可选同步**：「同步」页填电脑局域网 IP / 端口（默认 57900）/ 配对码 → 测试连接 →
+推送账号。协议与 workbuddy-console 的 `server/lansync/*` 一致。不填、不点，App 完全正常工作。
+
+## 架构
+
+纯 Android Framework + WebView，无 Gradle / AndroidX / 任何第三方依赖，用 build-tools 手工构建。
+WebView 里的 JS 无法伪造 `Origin` / `Referer` / `User-Agent` 指纹头，也过不了 CORS，
+因此所有上游请求由 Java 层 `HttpsURLConnection` 发出。
 
 ```
-手机 APK  ──HTTP /api/*──▶  电脑上的 buddy-switch serve  ──▶  Rust core ──▶  各平台
+assets/index.html  ←→  JsBridge.call(cbId, action, args)  ←→  PlatformRouter
+   （移动端 SPA）         （异步线程 + evaluateJavascript）      │
+        │                                                     ├─ WorkBuddyApi（fewards 协议）
+        │                                                     ├─ QoderApi（PKCE 设备授权）
+        │                                                     └─ TraeApi（JWT + 设备头）
+        └────────────── AccountStore（本机账号库，含 platform 字段）
 ```
 
-手机端复用同一套 284 条路由契约，把**可远程化**的功能完整实现；桌面专属能力仍留在电脑上执行，
-由手机发起指令（例如「切换账号」调用 `/api/switch`，实际写文件由服务端完成）。
+| 文件 | 职责 |
+|:--|:--|
+| `assets/index.html` | SPA：首页 / 账号（平台筛选）/ 同步 / 设置，内嵌自研二维码编码器 |
+| `src/.../Platforms.java` | 三平台能力矩阵、标签、是否支持扫码 |
+| `src/.../PlatformRouter.java` | 按账号平台分派签到 / 领积分 / 查额度 / 刷新 |
+| `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、签到、额度 |
+| `src/.../TraeApi.java` | Trae JWT 解析与导入、签到、权益包聚合 |
+| `src/.../WorkBuddyApi.java` | WorkBuddy 登录、签到、成长中心、积分、刷新、lansync |
+| `src/.../WbVariant.java` | WorkBuddy 国内 / 国际档位域名与指纹头 |
+| `src/.../AccountStore.java` | 本机账号库，`platform` 字段隔离三平台（历史数据默认 wb） |
+| `src/.../Http.java` | 通用 HTTP(S) 引擎，`Connection: close` 避免死连接复用 |
+| `src/.../JsBridge.java` | 统一 `call` 分发 + 通知 / 打开浏览器 / 自动签到 |
+| `src/.../AutoCheckinReceiver.java` | 本地定时签到，经 PlatformRouter 遍历全部平台 |
 
-详见 [docs/PC-TO-MOBILE.md](docs/PC-TO-MOBILE.md)。
+二维码生成器为自包含实现（Byte mode / ECL-M / mask 0 / version 1–20），纠错块表由
+Python `qrcode` 导出并与标准库**逐位比对验证**通过，无 CDN、无运行时依赖。
 
----
-
-## 2. 已实现功能
-
-| 模块 | 功能 | 对应路由 |
-|:--|:--|:--|
-| **账号登录** | 服务连接配置（地址 / 端口 / 协议 / 令牌）、连接自检 | `GET /api/status` |
-| | OAuth 扫码添加账号（发起 → 浏览器授权 → 轮询结果） | `POST /api/oauth/start`、`/api/oauth/status` |
-| | Trae / Qoder 各自的 OAuth 入口 | `/api/trae/oauth/*`、`/api/qoder/oauth/*` |
-| | 粘贴授权凭据导入 | `POST /api/accounts/paste-credential` |
-| **积分查看** | 6 个作用域切换（`wb-cn` / `wb-global` / `trae-cn` / `trae-global` / `qoder-cn` / `qoder-global`） | — |
-| | 逐账号额度 / 剩余 / 进度条 / 到期预警 | `POST /api/credits/query` |
-| | 单账号积分详情弹层、积分统计、Trae / Qoder 积分 | `/api/credits/stats`、`/api/trae/credits`、`/api/qoder/credits` |
-| **自动签到** | 今日签到状态、单账号签到、一键签到全部 | `/api/checkin/status`、`/api/checkin`、`/api/checkin/all` |
-| | Trae 批量签到、Qoder 领取签到 | `/api/trae/checkin`、`/api/qoder/checkin/claim` |
-| | **Android 端定时自动签到**（AlarmManager + 开机重登记 + 系统通知） | 本地 AlarmManager |
-| | 签到日志、服务端自动签到配置 | `/api/checkin/logs`、`/api/checkin/config` |
-| **账号管理** | 账号列表 / 搜索 / 当前账号标记 | `/api/accounts/list`、`/api/trae/accounts`、`/api/qoder/accounts` |
-| | 切换账号、修改备注、删除、回收站查看与恢复 | `/api/switch`、`/api/accounts/remark`、`/api/accounts/delete`、`/api/accounts/trash/*` |
-| **概览 / 设置** | 待办（需重登 / 今日未签 / 积分将到期）、快捷操作、最近签到结果 | 组合 |
-| | 演示模式、通知开关、运行日志、API 路由速查 | 本地 |
-
-**演示模式**：不连服务端也能浏览全部界面（内置 4 个示例账号与签到日志）。
-桌面浏览器直接打开 `assets/index.html` 会自动进入演示模式，方便预览 UI。
-
----
-
-## 3. 连接电脑端
-
-服务端默认只绑回环，且有 Host 白名单校验（`api_guard.rs`）。手机访问需两步：
+## 构建
 
 ```bash
-# Linux / macOS
-BUDDY_SWITCH_ALLOWED_HOSTS=192.168.1.5:57890 \
-  buddy-switch serve --host 0.0.0.0
-
-# Windows PowerShell
-$env:BUDDY_SWITCH_ALLOWED_HOSTS="192.168.1.5:57890"
-buddy-switch serve --host 0.0.0.0
+cd /workspace/android
+./build.sh                       # 需要 ANDROID_SDK_ROOT（platform 34 + build-tools 34.0.0）
+ALLOW_REBUILD=1 ./build.sh       # 同一 versionCode 内只改资源 / SPA 时重新构建
 ```
 
-把 `192.168.1.5` 换成电脑的局域网 IP，手机与电脑连同一 Wi-Fi。
-然后在 App「设置」里填主机 / 端口 → **测试连接** → **保存配置**。
+发新版本只需改 `AndroidManifest.xml` 的 `versionCode`（+1）与 `versionName`。
 
-`ApiClient` 刻意**不发送** `Origin` / `Sec-Fetch-Site`，所有 POST 都带
-`Content-Type: application/json`，正好满足服务端的四条来源校验；否则会返回 403
-`host_not_allowed` / `not_json`。
+### 签名一致性与版本号依次升号
 
-> ⚠️ 管理面能读写账号库与网关 Key，仅应在可信局域网内暴露，或用反向代理加鉴权。
+| 机制 | 实现 |
+|:--|:--|
+| 签名密钥固定 | `signing/release.keystore`，**不在** `build/` 内；`build.sh` 只复用不重建 |
+| 指纹锚点 | `signing/FINGERPRINT.txt`（证书 SHA-256），构建后强制比对，漂移即删产物并失败 |
+| 版本号单一数据源 | `build.sh` 从 `AndroidManifest.xml` 读取，不再硬编码 |
+| 依次升号 | 已有 `dist/agent.apk` 时要求新 `versionCode` 严格大于旧值，否则拒绝构建 |
 
----
+当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）均可直接覆盖安装**；
+v1.x 的私钥已永久丢失，那两个历史版本升级需卸载最后一次。
+换机 / 重新 clone 后构建必须带上整个 `signing/` 目录，详见 [signing/README.md](signing/README.md)。
 
-## 4. 目录结构
+## 安全
 
-```
-android/
-├── AndroidManifest.xml          # 权限、Activity、两个 Receiver、明文流量配置
-├── build.sh                     # 纯 build-tools 手工构建（无 Gradle / AndroidX）
-├── assets/index.html            # 移动端 SPA（HTML + CSS + JS，单文件、零依赖）
-├── res/                         # 图标 / 主题 / 网络安全配置
-├── src/com/buddyswitch/agent/
-│   ├── MainActivity.java        # WebView 宿主
-│   ├── JsBridge.java            # JS ↔ 原生桥（HTTP / 配置 / 通知 / 打开浏览器）
-│   ├── ApiClient.java           # /api/* HTTP 客户端（对齐 api_guard 校验）
-│   ├── Prefs.java               # 本地配置与运行日志
-│   ├── AutoCheckinReceiver.java # 定时签到（链式 setExactAndAllowWhileIdle）
-│   └── BootReceiver.java        # 开机 / 更新后重登记闹钟
-├── docs/
-│   ├── PC-TO-MOBILE.md          # 功能迁移对照与取舍说明
-│   └── API-CONTRACT.md          # 已适配路由速查
-└── dist/agent.apk               # 构建产物
-```
+- access/refresh token、Trae JWT 只存在 App 私有 `SharedPreferences`（`secure_store`），日志不打印明文。
+- 同步只允许**局域网私有网段**，填公网 IP 会直接拒绝。
+- 导出账号 JSON 是明文，需自行保管。
+- Qoder `machine_id`、Trae 设备头按 uid 稳定派生并持久化，避免上游把同一账号识别为频繁换设备。
+- 自动签到受 Android Doze / 厂商省电策略影响，间隔不保证精确。
 
-## 5. 从源码构建
+## 参考实现与文档
 
-前置：JDK 8+、Android SDK `platforms;android-34` + `build-tools;34.0.0`。
-
-```bash
-export ANDROID_SDK_ROOT=/path/to/android-sdk
-./build.sh              # 输出 dist/agent.apk
-```
-
-脚本依次执行 `aapt2 compile → aapt2 link → javac → d8 → 装入 dex → zipalign → apksigner sign`。
-**不依赖 Gradle、AndroidX、Material 或任何联网依赖**，可离线复现。
-调试签名证书由脚本自动生成（`build/debug.keystore`，仅用于自测，勿用于分发）。
-
-安装：
-
-```bash
-adb install -r dist/agent.apk
-```
-
-## 6. 限制与合规
-
-- 手机端只连接**你自己填写的**服务端；App 本身不直连 WorkBuddy / Trae / Qoder 的任何接口，
-  也不保存凭据明文（凭据输入后立即转发给服务端）。
-- 自动签到受 Android 后台限制（Doze / 厂商省电策略）影响，间隔不保证精确；
-  建议同时在服务端保留自动签到作为兜底。
-- 桌面专属能力（本机文件读写、IDE 注入、网关端口监听、会话副本）**不在手机端**，
-  仍需桌面端运行。
-- 沿用上游 **PolyForm Noncommercial 1.0.0** 许可：仅个人非商业使用，禁止商用。
-  非官方第三方工具，使用前请阅读仓库的 `docs/policies/DISCLAIMER.md`。
+- 协议来源：[fewards](https://github.com/loma18/fewards)、[workbuddy-console](https://github.com/loma18/workbuddy-console)、
+  [qoder-trae-workbuddy-switch](https://github.com/loma18/qoder-trae-workbuddy-switch)（`crates/buddy-switch-core/src/modules/{qoder,trae}/*`）。
+- [docs/API-CONTRACT.md](docs/API-CONTRACT.md) — 三平台逐端点契约
+- [docs/PC-TO-MOBILE.md](docs/PC-TO-MOBILE.md) — 架构演进与参考实现对照
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 登录 / 签到 / 同步排查
+- [signing/README.md](signing/README.md) — 签名密钥保管与覆盖安装条件

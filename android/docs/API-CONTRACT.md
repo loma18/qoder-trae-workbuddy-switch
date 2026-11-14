@@ -1,315 +1,412 @@
-# 已适配的 API 契约速查
+# 官方 API 契约（v2.1 · WorkBuddy / Qoder / Trae 三平台独立版）
 
-> 来源：`dev` 分支 `src/lib/api.ts` 的 `ROUTES` 表（Tauri command → HTTP 路由），
-> 服务端实现位于 `crates/buddy-switch-server/src/api.rs`（axum）。
-> 图例：**✅** 手机端已调用 · **—** 契约已识别，暂未接入 UI。
+> 本 App 的 Java 层逐条实现以下端点，全部由手机直连官方域名，**不经过电脑**。
+> - WorkBuddy：来自 [fewards](https://github.com/loma18/fewards) `core/workbuddy/*` / `core/lansync/*`，
+>   与 [workbuddy-console](https://github.com/loma18/workbuddy-console) `server/workbuddy/*` / `server/lansync/*` 交叉核对。
+> - Qoder：来自 `qoder-trae-workbuddy-switch` dev 分支 `buddy-switch-core/src/modules/qoder/{oauth,region,api,device}.rs`。
+> - Trae：来自同仓库 `modules/trae/{jwt,credits,checkin}.rs`。
+>
+> 所有请求由 `Http.java` 的 `HttpsURLConnection` 发出（`Connection: close`），因为 WebView 内 JS
+> 无法伪造 `Origin` / `Referer` / `User-Agent` / `X-Requested-With`，且受 CORS 限制。
+> v1.x 的 `buddy-switch-server` `/api/*` 局域网路由已整体废弃。
 
-共识别 **284** 条路由，其中 **31** 条已在手机端接入。
+## 0. 三平台能力矩阵（`Platforms.java` / `PlatformRouter.java`）
 
-| 方法 | 路径 | Tauri command | 手机端 |
-|:--|:--|:--|:--:|
-| | **状态 / 连接（1）** | | |
-| `GET` | `/api/status` | `get_status` | ✅ |
-| | **账号（WorkBuddy）（25）** | | |
-| `POST` | `/api/account/group` | `set_account_group` | — |
-| `POST` | `/api/account/remark` | `set_account_remark` | — |
-| `GET` | `/api/account/token-today` | `get_account_token_today` | — |
-| `GET` | `/api/account/token-trend` | `get_gateway_token_trend` | — |
-| `GET` | `/api/account/usage-dim` | `get_gateway_usage_dim` | — |
-| `GET` | `/api/account/usage-reconcile` | `get_usage_reconcile` | — |
-| `GET` | `/api/accounts` | `get_accounts` | ✅ |
-| `POST` | `/api/accounts/delete` | `account_delete` | ✅ |
-| `POST` | `/api/accounts/export` | `accounts_export` | — |
-| `POST` | `/api/accounts/export-to-path` | `accounts_export_to_path` | — |
-| `POST` | `/api/accounts/import` | `accounts_import` | — |
-| `POST` | `/api/accounts/import-local` | `accounts_import_local` | — |
-| `GET` | `/api/accounts/list` | `accounts_list` | ✅ |
-| `POST` | `/api/accounts/open-dir` | `open_accounts_dir` | — |
-| `POST` | `/api/accounts/paste-credential` | `accounts_paste_credential` | ✅ |
-| `POST` | `/api/accounts/remark` | `account_remark` | ✅ |
-| `GET` | `/api/accounts/trash` | `account_trash_list` | ✅ |
-| `POST` | `/api/accounts/trash/clear` | `account_trash_clear` | — |
-| `POST` | `/api/accounts/trash/purge` | `account_purge` | — |
-| `POST` | `/api/accounts/trash/restore` | `account_restore` | ✅ |
-| `POST` | `/api/delete` | `delete_account` | — |
-| `POST` | `/api/switch` | `switch_account` | ✅ |
-| `GET` | `/api/switch/config` | `get_switch_config` | — |
-| `POST` | `/api/switch/config` | `save_switch_config` | — |
-| `GET` | `/api/switch/progress` | `switch_progress` | — |
-| | **积分（3）** | | |
-| `POST` | `/api/credits` | `get_credit_expiry` | ✅ |
-| `POST` | `/api/credits/query` | `credits` | ✅ |
-| `GET` | `/api/credits/stats` | `get_credit_statistics` | ✅ |
-| | **签到（7）** | | |
-| `POST` | `/api/checkin` | `checkin` | ✅ |
-| `POST` | `/api/checkin/all` | `checkin_all` | ✅ |
-| `GET` | `/api/checkin/config` | `get_auto_checkin_config` | ✅ |
-| `POST` | `/api/checkin/config` | `save_auto_checkin_config` | ✅ |
-| `GET` | `/api/checkin/logs` | `get_checkin_logs` | ✅ |
-| `GET` | `/api/checkin/status` | `get_checkin_status` | ✅ |
-| `POST` | `/api/checkin/status/query` | `checkin_status` | ✅ |
-| | **登录 / OAuth（4）** | | |
-| `POST` | `/api/auth/webview/close` | `auth_webview_close` | — |
-| `POST` | `/api/auth/webview/open` | `auth_webview_open` | — |
-| `POST` | `/api/oauth/start` | `oauth_start` | ✅ |
-| `POST` | `/api/oauth/status` | `oauth_status` | ✅ |
-| | **Trae（63）** | | |
-| `GET` | `/api/trae/account/token-today` | `get_trae_account_token_today` | — |
-| `GET` | `/api/trae/accounts` | `get_trae_accounts` | ✅ |
-| `POST` | `/api/trae/accounts/add` | `trae_add_account` | — |
-| `POST` | `/api/trae/accounts/delete` | `trae_delete_account` | — |
-| `POST` | `/api/trae/accounts/export` | `trae_export_accounts` | — |
-| `POST` | `/api/trae/accounts/export-to-path` | `trae_export_accounts_to_path` | — |
-| `POST` | `/api/trae/accounts/import` | `trae_import_accounts` | — |
-| `POST` | `/api/trae/accounts/import-local` | `trae_import_local_account` | — |
-| `POST` | `/api/trae/accounts/import/preview` | `trae_preview_import_accounts` | — |
-| `POST` | `/api/trae/accounts/remark` | `trae_set_account_remark` | — |
-| `POST` | `/api/trae/accounts/update` | `trae_update_account` | — |
-| `GET` | `/api/trae/capabilities` | `get_trae_capabilities` | — |
-| `POST` | `/api/trae/checkin` | `trae_checkin` | ✅ |
-| `GET` | `/api/trae/checkin/status` | `get_trae_checkin_status` | — |
-| `GET` | `/api/trae/checkin/status-map` | `get_trae_checkin_status_map` | — |
-| `GET` | `/api/trae/client-import/config` | `get_trae_client_db_config` | — |
-| `POST` | `/api/trae/client-import/path` | `save_trae_client_db_path` | — |
-| `GET` | `/api/trae/client-import/probe` | `probe_trae_client_db` | — |
-| `POST` | `/api/trae/client-import/unlock` | `unlock_trae_client_db` | — |
-| `GET` | `/api/trae/client-usage` | `get_trae_client_token_stats` | — |
-| `POST` | `/api/trae/cooldown/clear` | `trae_clear_cooldown` | — |
-| `GET` | `/api/trae/credits` | `get_trae_credits` | ✅ |
-| `POST` | `/api/trae/credits/refresh` | `trae_refresh_credits` | — |
-| `POST` | `/api/trae/device/reset` | `trae_reset_device` | — |
-| `GET` | `/api/trae/env` | `get_trae_env` | — |
-| `GET` | `/api/trae/gateway/client-models` | `get_trae_client_models` | — |
-| `POST` | `/api/trae/gateway/client-models/refresh` | `refresh_trae_client_models` | — |
-| `GET` | `/api/trae/gateway/config` | `get_trae_gateway_config` | — |
-| `POST` | `/api/trae/gateway/config` | `save_trae_gateway_config` | — |
-| `GET` | `/api/trae/gateway/keys` | `list_trae_api_keys` | — |
-| `POST` | `/api/trae/gateway/keys` | `create_trae_api_key` | — |
-| `POST` | `/api/trae/gateway/keys/delete` | `delete_trae_api_key` | — |
-| `POST` | `/api/trae/gateway/keys/plaintext` | `save_trae_api_key_plaintext` | — |
-| `POST` | `/api/trae/gateway/keys/policy` | `set_trae_key_policy` | — |
-| `POST` | `/api/trae/gateway/keys/restore` | `restore_trae_api_key` | — |
-| `POST` | `/api/trae/gateway/keys/revoke` | `revoke_trae_api_key` | — |
-| `GET` | `/api/trae/gateway/keys/usage` | `trae_key_usage` | — |
-| `GET` | `/api/trae/gateway/logs` | `get_trae_gateway_logs` | — |
-| `POST` | `/api/trae/gateway/logs/clear` | `clear_trae_gateway_logs` | — |
-| `GET` | `/api/trae/gateway/models` | `get_trae_gateway_models` | — |
-| `POST` | `/api/trae/gateway/pool/exclusions` | `set_trae_gateway_pool_exclusion` | — |
-| `GET` | `/api/trae/gateway/status` | `trae_gateway_status` | — |
-| `GET` | `/api/trae/gateway/usage-dim` | `get_trae_gateway_usage_dim` | — |
-| `POST` | `/api/trae/groups` | `trae_group_op` | — |
-| `POST` | `/api/trae/launch-client` | `trae_launch_client` | — |
-| `POST` | `/api/trae/legacy-merge` | `trae_merge_legacy_regions` | — |
-| `POST` | `/api/trae/login/save` | `trae_save_login` | — |
-| `GET` | `/api/trae/logs` | `get_trae_logs` | — |
-| `POST` | `/api/trae/oauth/cancel` | `trae_oauth_cancel` | — |
-| `POST` | `/api/trae/oauth/start` | `trae_oauth_start` | ✅ |
-| `POST` | `/api/trae/oauth/status` | `trae_oauth_status` | ✅ |
-| `POST` | `/api/trae/oauth/submit-callback` | `trae_oauth_submit_callback` | — |
-| `POST` | `/api/trae/open-data-dir` | `open_trae_data_dir` | — |
-| `GET` | `/api/trae/profiles` | `get_trae_profiles` | — |
-| `POST` | `/api/trae/profiles/backup` | `trae_backup_profile` | — |
-| `POST` | `/api/trae/profiles/delete` | `trae_delete_profile` | — |
-| `POST` | `/api/trae/profiles/restore` | `trae_restore_profile` | — |
-| `POST` | `/api/trae/refresh-jwt` | `trae_refresh_jwt` | — |
-| `GET` | `/api/trae/settings` | `get_trae_settings` | — |
-| `POST` | `/api/trae/settings` | `save_trae_settings` | — |
-| `POST` | `/api/trae/switch` | `trae_switch_account` | — |
-| `GET` | `/api/trae/token-stats` | `get_trae_token_statistics` | — |
-| `GET` | `/api/trae/variants` | `get_trae_variants` | — |
-| | **Qoder（46）** | | |
-| `GET` | `/api/qoder/accounts` | `get_qoder_accounts` | ✅ |
-| `POST` | `/api/qoder/accounts/delete` | `qoder_delete_account` | — |
-| `POST` | `/api/qoder/accounts/group` | `qoder_set_account_group` | — |
-| `POST` | `/api/qoder/accounts/import-local` | `qoder_import_local` | — |
-| `POST` | `/api/qoder/accounts/import-pat` | `qoder_import_pat` | — |
-| `POST` | `/api/qoder/accounts/refresh` | `qoder_refresh_account` | — |
-| `POST` | `/api/qoder/accounts/remark` | `qoder_set_account_remark` | — |
-| `POST` | `/api/qoder/accounts/switch` | `qoder_switch_account` | — |
-| `POST` | `/api/qoder/checkin/claim` | `qoder_checkin_claim` | ✅ |
-| `GET` | `/api/qoder/checkin/logs` | `qoder_checkin_logs` | — |
-| `GET` | `/api/qoder/checkin/status` | `qoder_checkin_status` | — |
-| `GET` | `/api/qoder/checkin/status-map` | `qoder_checkin_status_map` | — |
-| `GET` | `/api/qoder/credits` | `qoder_credits` | ✅ |
-| `GET` | `/api/qoder/gateway/config` | `get_qoder_gateway_config` | — |
-| `POST` | `/api/qoder/gateway/config` | `save_qoder_gateway_config` | — |
-| `GET` | `/api/qoder/gateway/keys` | `list_qoder_api_keys` | — |
-| `POST` | `/api/qoder/gateway/keys` | `create_qoder_api_key` | — |
-| `POST` | `/api/qoder/gateway/keys/delete` | `delete_qoder_api_key` | — |
-| `POST` | `/api/qoder/gateway/keys/plaintext` | `save_qoder_api_key_plaintext` | — |
-| `POST` | `/api/qoder/gateway/keys/policy` | `set_qoder_key_policy` | — |
-| `POST` | `/api/qoder/gateway/keys/restore` | `restore_qoder_api_key` | — |
-| `POST` | `/api/qoder/gateway/keys/revoke` | `revoke_qoder_api_key` | — |
-| `GET` | `/api/qoder/gateway/keys/usage` | `qoder_key_usage` | — |
-| `GET` | `/api/qoder/gateway/logs` | `get_qoder_gateway_logs` | — |
-| `POST` | `/api/qoder/gateway/logs/clear` | `clear_qoder_gateway_logs` | — |
-| `GET` | `/api/qoder/gateway/models` | `get_qoder_gateway_models` | — |
-| `POST` | `/api/qoder/gateway/pool/exclusions` | `set_qoder_gateway_pool_exclusion` | — |
-| `GET` | `/api/qoder/gateway/quota` | `qoder_gateway_quota` | — |
-| `GET` | `/api/qoder/gateway/status` | `qoder_gateway_status` | — |
-| `GET` | `/api/qoder/gateway/usage-dim` | `get_qoder_gateway_usage_dim` | — |
-| `GET` | `/api/qoder/local-sources` | `get_qoder_local_sources` | — |
-| `POST` | `/api/qoder/oauth/start` | `qoder_oauth_start` | ✅ |
-| `POST` | `/api/qoder/oauth/status` | `qoder_oauth_status` | ✅ |
-| `POST` | `/api/qoder/pro-pack/claim` | `qoder_pro_pack_claim` | — |
-| `GET` | `/api/qoder/pro-pack/status` | `qoder_pro_pack_status` | — |
-| `GET` | `/api/qoder/programs` | `qoder_program_status` | — |
-| `GET` | `/api/qoder/usage` | `qoder_usage` | — |
-| `GET` | `/api/qoder/web/credit-packs` | `qoder_web_credit_packs` | — |
-| `POST` | `/api/qoder/web/credit-packs/probe` | `qoder_web_credit_packs_probe` | — |
-| `POST` | `/api/qoder/web/login-close` | `qoder_web_login_close` | — |
-| `POST` | `/api/qoder/web/login-open` | `qoder_web_login_open` | — |
-| `GET` | `/api/qoder/web/proxy` | `qoder_web_proxy_get` | — |
-| `POST` | `/api/qoder/web/proxy` | `qoder_web_proxy_set` | — |
-| `POST` | `/api/qoder/web/session/logout` | `qoder_web_session_logout` | — |
-| `GET` | `/api/qoder/web/session/status` | `qoder_web_session_status` | — |
-| `GET` | `/api/qoder/web/session/window-cookies` | `qoder_web_window_cookies` | — |
-| | **网关 / Key / 模型（50）** | | |
-| `GET` | `/api/gateway/config` | `get_gateway_config` | — |
-| `POST` | `/api/gateway/config` | `save_gateway_config` | — |
-| `GET` | `/api/gateway/disabled-models` | `get_disabled_models` | — |
-| `POST` | `/api/gateway/disabled-models` | `set_model_disabled` | — |
-| `GET` | `/api/gateway/fallback-stats` | `get_fallback_stats` | — |
-| `GET` | `/api/gateway/keys` | `list_api_keys` | — |
-| `POST` | `/api/gateway/keys` | `create_api_key` | — |
-| `POST` | `/api/gateway/keys/delete` | `delete_api_key` | — |
-| `POST` | `/api/gateway/keys/plaintext` | `save_api_key_plaintext` | — |
-| `POST` | `/api/gateway/keys/policy` | `set_key_policy` | — |
-| `POST` | `/api/gateway/keys/restore` | `restore_api_key` | — |
-| `POST` | `/api/gateway/keys/revoke` | `revoke_api_key` | — |
-| `GET` | `/api/gateway/keys/usage` | `key_usage` | — |
-| `GET` | `/api/gateway/logs` | `get_gateway_logs` | — |
-| `POST` | `/api/gateway/logs/clear` | `clear_gateway_logs` | — |
-| `GET` | `/api/gateway/model-fallback` | `get_model_fallback` | — |
-| `POST` | `/api/gateway/model-fallback` | `save_model_fallback` | — |
-| `POST` | `/api/gateway/model-fallback/preview` | `preview_model_fallback` | — |
-| `GET` | `/api/gateway/model-image-caps` | `get_model_image_caps` | — |
-| `POST` | `/api/gateway/model-image-caps` | `set_model_image_cap` | — |
-| `GET` | `/api/gateway/models` | `get_gateway_models` | — |
-| `POST` | `/api/gateway/models/refresh` | `refresh_gateway_models` | — |
-| `POST` | `/api/gateway/open-data-dir` | `open_workbuddy_data_dir` | — |
-| `GET` | `/api/gateway/pool/exclusions` | `gateway_pool_exclusions` | — |
-| `POST` | `/api/gateway/pool/exclusions` | `set_gateway_pool_exclusion` | — |
-| `POST` | `/api/gateway/pool/revive` | `revive_gateway_account` | — |
-| `POST` | `/api/gateway/probe/cancel` | `probe_cancel` | — |
-| `GET` | `/api/gateway/probe/ledger` | `probe_ledger` | — |
-| `POST` | `/api/gateway/probe/start` | `probe_start` | — |
-| `GET` | `/api/gateway/probe/status` | `probe_status` | — |
-| `POST` | `/api/gateway/risk/recover` | `recover_gateway_risk_account` | — |
-| `GET` | `/api/gateway/status` | `gateway_status` | — |
-| `GET` | `/api/gateway/strategy` | `get_account_strategy` | — |
-| `POST` | `/api/gateway/strategy` | `save_account_strategy` | — |
-| `POST` | `/api/proxy/disable` | `proxy_disable` | — |
-| `POST` | `/api/proxy/enable` | `proxy_enable` | — |
-| `GET` | `/api/proxy/status` | `proxy_status` | — |
-| `GET` | `/api/unified-gateway/config` | `get_unified_gateway_config` | — |
-| `POST` | `/api/unified-gateway/config` | `save_unified_gateway_config` | — |
-| `GET` | `/api/unified-gateway/keys` | `list_unified_api_keys` | — |
-| `POST` | `/api/unified-gateway/keys` | `create_unified_api_key` | — |
-| `POST` | `/api/unified-gateway/keys/delete` | `delete_unified_api_key` | — |
-| `POST` | `/api/unified-gateway/keys/plaintext` | `save_unified_api_key_plaintext` | — |
-| `POST` | `/api/unified-gateway/keys/policy` | `set_unified_key_policy` | — |
-| `POST` | `/api/unified-gateway/keys/restore` | `restore_unified_api_key` | — |
-| `POST` | `/api/unified-gateway/keys/revoke` | `revoke_unified_api_key` | — |
-| `GET` | `/api/unified-gateway/keys/usage` | `unified_key_usage` | — |
-| `GET` | `/api/unified-gateway/keys/usage-all` | `unified_key_usage_all` | — |
-| `GET` | `/api/unified-gateway/models` | `get_unified_gateway_models` | — |
-| `GET` | `/api/unified-gateway/pool-overview` | `unified_gateway_pool_overview` | — |
-| | **用量 / 统计（6）** | | |
-| `GET` | `/api/rotate/config` | `get_auto_rotate_config` | — |
-| `POST` | `/api/rotate/config` | `save_auto_rotate_config` | — |
-| `GET` | `/api/rotate/logs` | `get_rotate_logs` | — |
-| `POST` | `/api/rotate/run` | `run_rotate` | — |
-| `GET` | `/api/rotate/status` | `rotate_status` | — |
-| `GET` | `/api/token-stats` | `get_token_statistics` | — |
-| | **备份 / 导入导出（12）** | | |
-| `GET` | `/api/backup/auto/config` | `get_auto_backup_config` | — |
-| `POST` | `/api/backup/auto/config` | `save_auto_backup_config` | — |
-| `GET` | `/api/backup/auto/list` | `list_auto_backups` | — |
-| `POST` | `/api/backup/auto/restore` | `restore_auto_backup` | — |
-| `POST` | `/api/backup/export` | `export_backup` | — |
-| `POST` | `/api/backup/import` | `import_backup` | — |
-| `POST` | `/api/backup/import/preview` | `preview_import_backup` | — |
-| `POST` | `/api/export-accounts` | `export_accounts` | — |
-| `POST` | `/api/export-accounts-to-path` | `export_accounts_to_path` | — |
-| `POST` | `/api/import` | `import_accounts` | — |
-| `POST` | `/api/import-local` | `import_local` | — |
-| `POST` | `/api/import/preview` | `preview_import_accounts` | — |
-| | **客户端 / 编辑器集成（25）** | | |
-| `POST` | `/api/agent-hooks/enabled` | `set_agent_hook_enabled` | — |
-| `GET` | `/api/agent-hooks/status` | `get_agent_hook_status` | — |
-| `POST` | `/api/codebuddy-cli/disable-gateway` | `codebuddy_cli_disable_gateway` | — |
-| `POST` | `/api/codebuddy-cli/enable-gateway` | `codebuddy_cli_enable_gateway` | — |
-| `POST` | `/api/codebuddy-cli/install-helper` | `install_codebuddy_cli_helper` | — |
-| `GET` | `/api/codebuddy-cli/status` | `get_codebuddy_cli_status` | — |
-| `POST` | `/api/codebuddy-cli/switch` | `switch_codebuddy_cli_account` | — |
-| `POST` | `/api/codebuddy-cn-ide/detect` | `detect_codebuddy_cn_ide_account` | — |
-| `GET` | `/api/codebuddy-cn-ide/status` | `get_codebuddy_cn_ide_status` | — |
-| `POST` | `/api/codebuddy-cn-ide/switch` | `switch_codebuddy_cn_ide_account` | — |
-| `POST` | `/api/codebuddy-ide/memory/merge` | `migrate_codebuddy_ide_memory` | — |
-| `POST` | `/api/companion/jump` | `companion_jump` | — |
-| `GET` | `/api/companion/status` | `companion_status` | — |
-| `POST` | `/api/companion/toggle` | `companion_toggle` | — |
-| `POST` | `/api/companion/visibility` | `companion_set_visible` | — |
-| `POST` | `/api/jetbrains-codebuddy-plugin/detect` | `detect_jetbrains_codebuddy_plugin_account` | — |
-| `GET` | `/api/jetbrains-codebuddy-plugin/status` | `get_jetbrains_codebuddy_plugin_status` | — |
-| `POST` | `/api/jetbrains-codebuddy-plugin/switch` | `switch_jetbrains_codebuddy_plugin_account` | — |
-| `POST` | `/api/vscode-codebuddy-plugin/detect` | `detect_vscode_codebuddy_plugin_account` | — |
-| `GET` | `/api/vscode-codebuddy-plugin/status` | `get_vscode_codebuddy_plugin_status` | — |
-| `POST` | `/api/vscode-codebuddy-plugin/switch` | `switch_vscode_codebuddy_plugin_account` | — |
-| `GET` | `/api/vscode-sessions` | `list_vscode_sessions` | — |
-| `POST` | `/api/vscode-sessions/copy` | `copy_vscode_sessions` | — |
-| `GET` | `/api/vscode-sessions/diff` | `diff_vscode_sessions` | — |
-| `POST` | `/api/vscode-sessions/sync` | `sync_vscode_sessions` | — |
-| | **其它（42）** | | |
-| `POST` | `/api/cache/clear` | `cache_clear` | — |
-| `GET` | `/api/cache/scan` | `cache_scan` | — |
-| `GET` | `/api/client-settings/backups` | `list_client_settings_backups` | — |
-| `POST` | `/api/client-settings/diff` | `diff_client_settings` | — |
-| `POST` | `/api/client-settings/patch` | `patch_client_settings` | — |
-| `GET` | `/api/client-settings/read` | `read_client_settings` | — |
-| `POST` | `/api/client-settings/restore` | `restore_client_settings_backup` | — |
-| `GET` | `/api/client-settings/slots` | `list_client_settings_slots` | — |
-| `GET` | `/api/client/limits` | `client_limits` | — |
-| `POST` | `/api/data-dir/open` | `open_data_dir` | — |
-| `POST` | `/api/diagnostics/export` | `export_diagnostic` | — |
-| `POST` | `/api/logs/open-dir` | `open_runtime_logs_dir` | — |
-| `GET` | `/api/logs/runtime` | `runtime_logs` | — |
-| `POST` | `/api/logs/runtime/clear` | `clear_runtime_logs` | — |
-| `POST` | `/api/logs/runtime/slow-call` | `report_slow_call` | — |
-| `POST` | `/api/migrate/account` | `migrate_account_data` | — |
-| `POST` | `/api/refresh-token` | `refresh_account_token` | — |
-| `GET` | `/api/schedule/config` | `get_schedule_config` | — |
-| `POST` | `/api/schedule/config` | `save_schedule_config` | — |
-| `POST` | `/api/schedule/run` | `run_schedule_task` | — |
-| `GET` | `/api/sessions` | `list_sessions` | — |
-| `POST` | `/api/sessions/copy` | `copy_sessions` | — |
-| `POST` | `/api/sessions/export` | `export_sessions_bundle` | — |
-| `POST` | `/api/sessions/import` | `import_sessions_bundle` | — |
-| `GET` | `/api/sessions/import/preview` | `preview_sessions_bundle` | — |
-| `GET` | `/api/sessions/replicas` | `list_session_replicas` | — |
-| `POST` | `/api/sessions/replicas/prune` | `prune_session_replicas` | — |
-| `POST` | `/api/sessions/sync` | `sync_session_replicas` | — |
-| `POST` | `/api/sessions/unify` | `unify_session_replicas` | — |
-| `GET` | `/api/settings/risk-controls` | `get_risk_control_settings` | — |
-| `POST` | `/api/settings/risk-controls` | `save_risk_control_settings` | — |
-| `GET` | `/api/skills` | `list_skills` | — |
-| `POST` | `/api/skills/copy-cross` | `copy_skills_cross` | — |
-| `POST` | `/api/skills/enabled` | `set_skill_enabled` | — |
-| `POST` | `/api/skills/import` | `import_skill` | — |
-| `POST` | `/api/skills/open-dir` | `open_skills_dir` | — |
-| `GET` | `/api/travel/config` | `get_auto_travel_config` | — |
-| `POST` | `/api/travel/config` | `save_auto_travel_config` | — |
-| `GET` | `/api/travel/status` | `get_travel_status` | — |
-| `GET` | `/api/update/check` | `check_update` | — |
-| `GET` | `/api/update/config` | `get_github_config` | — |
-| `POST` | `/api/update/config` | `save_github_config` | — |
+| 平台 | 扫码登录 | 每日签到 | 成长中心 | 查积分 | 手机独立 | 电脑角色 |
+|:--|:--:|:--:|:--:|:--:|:--:|:--|
+| WorkBuddy 国内版 `wb/cn` | ✅ `/v2/plugin/auth/*` | ✅ | ✅ | ✅ | ✅ | 可选（lansync 同步） |
+| WorkBuddy 国际版 `wb/ai` | ✅ 同协议换域名 | ❌ 上游无接口 | ❌ | ✅ | ✅ | 可选 |
+| Qoder 国内版 `qoder/cn` | ✅ PKCE 设备授权 | ✅ 签到即领积分 | ❌ | ✅ 额度 | ✅ | 不需要 |
+| Qoder 国际版 `qoder/ai` | ✅ | ✅ | ❌ | ✅ | ✅ | 不需要 |
+| Trae 国内版 `trae/cn` | ❌ 上游限制 | ✅ 粘贴 JWT 后 | ❌ | ✅ | ✅（JWT 导入后） | 仅首次导出 JWT |
+| Trae 国际版 `trae/ai` | ❌ | ✅ | ❌ | ✅ | ✅（JWT 导入后） | 仅首次导出 JWT |
 
-## 关键约定
+分派规则：`PlatformRouter.checkinOne/creditsOne/growthOne/refreshOne` 按账号的 `platform` 字段
+路由到 `WorkBuddyApi` / `QoderApi` / `TraeApi`。历史账号无 `platform` 字段时 `Platforms.of()`
+一律归为 `wb`，**升级后旧账号行为完全不变**。`JsBridge` 与 `AutoCheckinReceiver` 都只调
+`PlatformRouter`，避免两处各写一套平台判断。
 
-- **Scope**：`wb-cn` / `wb-global` / `trae-cn` / `trae-global` / `qoder-cn` / `qoder-global`（`src/lib/scope.ts` 的 `SCOPES`）。
-- **Region**：`cn` / `global`；统计查询可用 `all`。
-- **GET** 参数走 query string；**POST** 参数走 JSON body（camelCase）。
-- 服务端 `api_guard.rs`：Host 必须回环或在 `BUDDY_SWITCH_ALLOWED_HOSTS` 白名单；
-  禁止 `Origin` 跨源 / `Sec-Fetch-Site: cross-site`；非 GET 请求必须 `Content-Type: application/json`。
-- 默认端口：`57890`（界面 + API）；网关 `57891` WorkBuddy / `57892` 统一 / `57894` Trae / `57895` Qoder。
+---
+
+# 一、WorkBuddy（`WbVariant.java` / `WorkBuddyApi.java`）
+
+## 1. 两档位
+
+两档是**两套独立客户端**、两套域名、两套登录态，**绝不跨档请求**：国际版 token 打国内域只会 401。
+
+| | `cn` 国内版 | `ai` 国际版 |
+|:--|:--|:--|
+| 客户端名 | WorkBuddy | WorkBuddy AI |
+| `apiEndpoint`（积分/成长/Origin/Referer） | `https://www.codebuddy.cn` | `https://www.workbuddy.ai` |
+| `chatBase`（登录/刷新） | `https://copilot.tencent.com` | `https://www.workbuddy.ai` |
+| 扫码 `platform` | `CLI` | `workbuddy-ai` |
+| UA 平台名 | `WorkBuddy` | `WorkBuddy AI` |
+| 签到接口 | ✅ | ❌ 显式跳过 |
+| 成长中心 | ✅ | ❌ 显式跳过 |
+
+归一化：`ai` / `workbuddy-ai` / `intl` → `ai`，其余（含缺失）→ `cn`（历史数据零迁移）。
+账号 id 在国际版带前缀 `wb_ai_<uid>`，避免两档同 uid 互相覆盖。
+
+## 2. 扫码登录（纯 HTTP，手机独立完成）
+
+出站指纹头（两档共用，仅 Origin/Referer 随档位变）：
+
+```
+Content-Type: application/json
+Accept: application/json, text/plain, */*
+X-Requested-With: XMLHttpRequest
+User-Agent: CLI/2.63.2 CodeBuddy/2.63.2
+Origin: {apiEndpoint}
+Referer: {apiEndpoint}/
+```
+
+| 步 | 请求 | 响应 / 判定 |
+|:--|:--|:--|
+| ① 发起 | `POST {chatBase}/v2/plugin/auth/state?platform={oauthPlatform}`，body `{}` | `data{state, authUrl}`；**`authUrl` 即二维码内容，也是可直接在浏览器打开的授权页** |
+| ② 轮询 | `GET {chatBase}/v2/plugin/auth/token?state={state}`，每 2 秒 | `code != 0` = 仍在等待（实测未扫码 `11217 "login ing..."`），**不是错误**；`code==0` 时 `data{accessToken, refreshToken, expiresIn, domain}` |
+| ③ 账号 | `GET {chatBase}/v2/plugin/login/account?state={state}`，加 `Authorization: Bearer {accessToken}` | `data{uid, nickname, enterpriseId}` |
+
+- 统一信封 `{code, msg, data}`；**判定只看 `code`**，缺 `code` 字段必须算失败。
+- 本地会话 TTL **5 分钟**（`STATE_TTL_MS`），轮询全程沿用**发起时的档位**，不跟随界面上后来切换的档位。
+- 响应 `domain` 与档位不符时**拒绝入库**（跨档 token 会一直显示"登录失效"）。空 domain 放行。
+- 扫码成功后**只纳管、不自动签到**；签到由首页「一键签到并领取积分」或账号页单独触发。
+- 昵称兜底：JWT 的 `nickname`（去掉控制字符）→ `preferred_username` → 默认文案。
+
+> 这套协议**不需要**桌面客户端设备私钥，也**没有** `127.0.0.1:17388` 回环回调，
+> 因此手机可以独立完成。这是与 `qoder-trae-workbuddy-switch` Tauri 版 OAuth 的根本区别。
+
+## 3. 每日签到（仅国内版）
+
+`POST https://copilot.tencent.com/billing/meter/{checkin-status|daily-checkin}`，body `{}`
+
+```
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer {access_token}
+```
+
+| 情形 | 判定 |
+|:--|:--|
+| HTTP 401 / 403 | token 已过期，需刷新或重新扫码 |
+| 状态接口 2xx 且 `data.today_checked_in == true` | 今日已签，短路返回成功（该字段**不可靠**，仅省一次请求） |
+| `daily-checkin` `code == 0` | 领取成功（`data.credit` / `data.streak_days`） |
+| `daily-checkin` `code == 10001`（HTTP 400） | **今日已签，视为成功** |
+| 其它 | 失败，展示 `msg` |
+
+国际版账号由 `supportsCheckin=false` **显式跳过并返回成功**，不计入失败、不显示红字。
+
+## 4. 成长中心领积分（仅国内版）
+
+`BASE = https://www.codebuddy.cn/v2/activity/growth`
+
+```
+Authorization: Bearer {access_token}
+X-Client-Platform: web
+Content-Type / Accept: application/json
+Origin: https://www.codebuddy.cn
+Referer: https://www.codebuddy.cn/profile/plans-usage
+X-User-Id: {uid}                          （有则带）
+X-Enterprise-Id / X-Tenant-Id: {enterpriseId}  （有则带）
+```
+
+| 动作 | 端点 | 要点 |
+|:--|:--|:--|
+| 查任务 | `GET /tasks` | 取 `tasks[]`：`task_code` / `title` / `locked` / `accept_status` / `reward_credit` |
+| 接单 | `POST /tasks/accept` | body **`{"task_codes":[...]}`**（复数；单数一律 400），分批 ≤20 |
+| 领奖 | `POST /tasks/{code}/claim` | 只有 `accept_status == "completed"` 才发奖；`already_claimed` 跳过 |
+| Buddy 旅行 | `GET /buddy/travel/status` → `POST /buddy/travel/claim` | `arrived` 才能领，带可选 `record_id` |
+
+响应字段可能被 `data` / `result` / `resp` / `response` 包裹，需递归查找。
+**写操作不重试**（claim / depart 等超时时服务端可能已处理完成）。
+
+## 5. 积分余额
+
+`POST {apiEndpoint}/billing/meter/get-user-resource-summary`，body `{}`，头同上。
+
+- 信封 `code != 0` 视为业务失败；401/403 = 登录态失效。
+- `data.Packages[]` 为**权威数额**：`CycleTotalCapacity` / `CycleRemainCapacity` / `CycleUsedCapacity` / `PackageCode` / `CapacityUnit`。
+- 明细端点 `get-user-resource-paid-packages` / `get-user-resource-free-packages` 只用于补到期时间，
+  **不要把逐笔历史相加**（会与周期口径重复计算）。
+- 包到期取「还有额度的那几笔里最早的」；`DeductionEndTime` 比 `CycleEndTime` 晚整 30 天视为长期占位。
+- 汇总接口不含到期字段时，界面如实显示「未知」，不要伪造 1970。
+
+## 6. 凭据刷新（轮换式）
+
+`POST {chatBase}/v2/plugin/auth/token/refresh`，body `{}`
+
+```
+...登录指纹头（UA 改为 WorkBuddy/5.5.4 {uaPlatform}/5.5.4 CLI/2.137.1）...
+X-CodeBuddy-Request: 1
+X-Refresh-Token: {refresh_token}      ← 只允许出现在这个头里
+X-Auth-Refresh-Source: plugin
+X-User-Id: {uid}
+```
+
+响应兼容 `{code,data}` 信封与裸对象，字段名兼容 `accessToken`/`access_token`、
+`refreshToken`/`refresh_token`、`expiresIn`/`expires_in`、`refreshExpiresIn`/`refresh_expires_in`。
+
+> **refresh_token 是轮换式的**：刷新成功后旧值立刻作废。手机和电脑各持一份时，
+> 一次刷新就会让另一份失效。排查"这台能用、那台掉登录"时要分别看两边的 access/refresh 到期时间。
+
+---
+
+# 二、Qoder（`QoderApi.java`）
+
+设备授权是**纯 HTTP**（PKCE + 轮询），`machine_id` 缺失时自造 UUID 并持久化，
+全程无本地回环、无桌面客户端设备私钥，**手机可独立登录**。
+
+## 1. 两区域常量表
+
+| | `cn` 国内版 | `ai` 国际版 |
+|:--|:--|:--|
+| `website`（授权页 / Origin / Referer） | `https://qoder.com.cn` | `https://qoder.com` |
+| `openapi`（业务接口） | `https://openapi.qoder.com.cn` | `https://openapi.qoder.sh` |
+| `client_id` | `1c5e33e1-364d-4ce6-b02c-acaa81274a5c` | `e883ade2-e6e3-4d6d-adf7-f92ceff5fdcb` |
+| `User-Agent` | `QoderWork/1.1.64` | `Qoder/1.1.64` |
+| `nonce` 形态 | 带连字符 UUID | 去连字符 32 位 |
+| `redirect_uri` | `qoder-work-cn://`（授权 URL 必带） | 不带 |
+
+归一化：只有 `"ai"` → `ai`，其余 → `cn`。`machine_id` 按档位存 `Prefs["qoder.machine." + v]`，
+首次随机生成后**长期复用**（上游按机器身份做风控）。
+
+## 2. 设备授权登录
+
+### ① 发起（`loginStart`，不发任何网络请求）
+
+本地生成 64 字符 PKCE `verifier`（字母表 `A-Za-z0-9-._~`）、`challenge = BASE64URL(SHA256(verifier))`、
+`nonce`，构造授权页 URL：
+
+```
+{website}/device/selectAccounts
+    ?challenge={challenge}
+    &challenge_method=S256
+    &nonce={nonce}
+    &client_id={client_id}
+    &machine_id={machine_id}
+    [&redirect_uri=qoder-work-cn://]     ← 仅国内版
+```
+
+`authUrl` 即二维码内容，也可直接在手机浏览器打开。会话 TTL 5 分钟（`TTL_MS`），
+`state` 前缀固定为 `qoder_`（`JsBridge` 据此把轮询分派到 Qoder）。
+
+### ② 轮询换 token（`loginPoll`）
+
+```
+GET {openapi}/api/v1/deviceToken/poll
+    ?nonce={nonce}&verifier={verifier}&challenge_method=S256
+Accept: application/json, text/plain, */*
+User-Agent: {ua(variant)}
+```
+
+| HTTP / 响应 | 判定 |
+|:--|:--|
+| 网络异常 | `status=pending`，可重试 |
+| `202` / `404` | **仍在等待扫码 / 确认授权**，不是错误 |
+| 2xx 但无 `token` 字段 | 授权处理中，继续轮询 |
+| 2xx 且拿到 token | 进入 ③ |
+
+token 字段名兼容 `token` / `device_token` / `access_token` / `accessToken`；
+`expires_in` 有则换算为 `expiresAt`（秒），否则默认 1 小时。
+
+### ③ 取账号身份
+
+```
+GET {openapi}/api/v1/userinfo
+Authorization: Bearer {token}
+```
+
+取 `id` → `uid`，`name` / `nickname` / `email` → 昵称，落 `AccountStore.makeFor("qoder", ...)`。
+
+> **Qoder 不做手机端 token 刷新**：`refreshOne()` 返回「请在电脑端刷新后重新粘贴导入」的跳过提示。
+
+## 3. 业务请求头（`openapiHeaders`，对齐 `api.rs`）
+
+```
+Content-Type: application/json
+Accept: application/json, text/plain, */*
+User-Agent: {ua(variant)}
+Authorization: Bearer {token}
+X-Request-ID: md5("req:"+uid)[0:24] + "-" + 6位时间尾数
+X-Machine-ID: md5("machine:"+uid)      ← device.rs::derive_id，按 uid 稳定派生
+X-Session-ID: md5("session:"+uid)
+Origin: {website}
+Referer: {website}/
+```
+
+`uid` 为空时用 `anonymous` 兜底，避免生成空串机器码。
+
+## 4. 每日签到（签到即领积分）
+
+| 动作 | 端点 | 要点 |
+|:--|:--|:--|
+| 查状态 | `GET {openapi}/sash/api/v1/me/daily-check-in/status` | `404/405/410` = 该区域暂未开放（Qoder 已改活动领积分），**跳过**；`checked_in`/`checkedIn`/`claimed`/`status=CLAIMED|CHECKED|DONE` = 今日已签 |
+| 领取 | `POST {openapi}/sash/api/v1/me/daily-check-in/claim`，body `{}` | 非 2xx 但响应含 `already`/`checked`/`已签` 也算今日已签 |
+
+## 5. 额度查询
+
+`GET {openapi}/api/v2/quota/usage`，响应取 `userQuota` + `addOnQuota` 两个对象，
+各自累加 `remaining` / `used` / `total`，单位 `credits`。两者都缺即视为响应异常。
+
+---
+
+# 三、Trae（`TraeApi.java`）
+
+## 1. 为什么不做独立扫码登录
+
+`trae/oauth.rs` 的授权 URL 必须携带从桌面客户端 `storage.json` **解密出的 `privateKeyPEM` / `deviceId`**
+（`icube::device_identity_for`），且授权页会主动探测 `127.0.0.1:17388` 判断客户端在线。
+这两者在手机上都不存在，上游不通过 —— **这是上游协议限制，不是 App 的取舍**。
+
+但 `trae/credits.rs` 与 `trae/checkin.rs` 证明：**签到与积分接口只校验 JWT + 本机自造的设备请求头**。
+因此用户从桌面客户端导出一次 `Cloud-IDE-JWT …` 后，手机即可长期独立签到、领积分、查余额，
+此后完全不再依赖电脑。`JsBridge.loginStart` 对 Trae 直接返回引导文案，不发起网络请求。
+
+## 2. JWT 导入（`addManual`）
+
+| | 国内版 `cn` | 国际版 `ai` |
+|:--|:--|:--|
+| `base` | `https://api.trae.cn` | `https://grow-normal.trae.ai` |
+
+- `normalize()` 剥掉 `Cloud-IDE-JWT ` / `Bearer ` 前缀与首尾空白。
+- 解 JWT payload（Base64URL → 补 `=` → decode）：`data.id` → `auth_id` → `sub` → `user_id` → `uid` 取 userId；
+  `nickname` / `name` / `email` 取昵称，兜底「Trae 账号」；`exp` → `expiresAt`（秒）。
+- 找不到 userId 直接拒绝导入（后续接口强依赖 uid 派生设备头）。
+
+## 3. 请求头（`buildHeaders`，对齐 `credits.rs::build_headers`）
+
+> 源码注释标注「线上实测契约，不要顺手改」。
+
+```
+accept: */*
+accept-language: zh-CN
+authorization: Cloud-IDE-JWT <jwt>        ← 已带前缀则原样使用
+content-type: application/json
+user-agent: VSCode 1.107.1 (TRAE SOLO CN)
+x-market-client-id: VSCode 1.107.1
+x-market-user-id: {device.marketUserId}
+x-user-region: CN
+x-device-id: {device.deviceId}            ← 15 位数字
+x-lgw-req-sdk-type: 3
+package-type: stable_cn
+x-request-id: {uuid}
+x-lscbd-aid: 787976
+x-lscbd-platform: linux
+app-version: 0.1.45
+x-tt-trace-id: 00-{16位hex}-01
+vscode-sessionid: {device.sessionId}
+sec-fetch-dest: empty
+sec-fetch-mode: no-cors
+sec-fetch-site: none
+```
+
+**设备身份按 uid 稳定派生并持久化**（`Prefs["trae.dev." + md5(uid)]`）：`deviceId` / `marketUserId` /
+`sessionId` 首次随机生成后不再变化。上游按机器身份做风控，同一账号每次换设备头会被关联或限流。
+
+## 4. 签到领积分
+
+| 动作 | 端点 | 要点 |
+|:--|:--|:--|
+| 查状态 | `POST {base}/trae/api/v2/ug/checkin_credits/status`，body `{}` | `checked_in` / `checkedIn` = 今日已签 |
+| 领取 | `POST {base}/trae/api/v2/ug/checkin_credits/claim`，body `{}` | `code != 0` 且 `message` 非 `success`/空 → 失败；含「已签」/`already` 视为今日已签 |
+
+## 5. 积分查询
+
+`POST {base}/trae/api/v2/pay/ide_user_ent_usage`，body `{"require_usage":true,"full_data":true}`。
+
+响应 `user_entitlement_pack_list[]`（也可能包在 `data` 下），逐包取
+`entitlement_base_info.quota.credits_limit` 减 `usage.credits_amount` 得剩余；
+聚合 `total` / `used` / `remaining`，到期取还有额度的包里最早的 `expire_time`（秒，输出时 ×1000）。
+
+> Trae / Qoder 都**不提供手机端刷新**：`refreshOne()` 返回跳过提示，JWT / token 过期后需重新导出粘贴。
+
+---
+
+# 四、可选：同步到电脑（lansync，仅 WorkBuddy）
+
+`http://{局域网IP}:57900/api/lansync/*`，除 ping 外均需 `Authorization: Bearer {配对码}`。
+对齐 workbuddy-console `server/lansync/server.mjs` 与 fewards `LanSyncProtocol.kt`。
+**Qoder / Trae 账号不参与 lansync**（凭据模型不同）。
+
+| 方法 | 路径 | 用途 |
+|:--|:--|:--|
+| GET | `/api/lansync/ping` | 探测在线 / 是否需配对，不鉴权 |
+| POST | `/api/lansync/push` | 手机推账号 → 电脑端合并落库，回传最终凭据 |
+| POST | `/api/lansync/fetch` | **只读**取回电脑端凭据（不写电脑端账号库） |
+| GET | `/api/lansync/pending` | 拉"电脑刷新过、还没通知手机"的队列 |
+| POST | `/api/lansync/ack` | 确认收到，出队 |
+
+push body：
+
+```json
+{
+  "version": 1,
+  "device": {"name": "<手机型号>", "platform": "android"},
+  "mode": "merge",
+  "accounts": [{
+    "uid": "...", "label": "...", "enterpriseId": "...",
+    "accessToken": "...", "refreshToken": "...",
+    "expiresAt": 1730000000,        // 秒
+    "refreshExpiresAt": 1730000000, // 秒
+    "obtainedAt": 1730000000000,    // 毫秒
+    "version": 0,
+    "variant": "cn"                 // cn | ai
+  }]
+}
+```
+
+**单位最容易写错**：`expiresAt` / `refreshExpiresAt` 是**秒**，`obtainedAt` / `refreshedAt` 是**毫秒**。
+差 1000 倍不会崩，只会让账号"刚同步完就显示过期"。`version` 由电脑端维护，手机恒发 0。
+
+`fetch` 的合并规则（对齐 fewards 设置页「从电脑同步凭据」）：
+- 手机端**已失效**的账号补 token；**没有**的账号直接建号（不必先扫码）；仍有效的**一律不动**；
+- 已有账号只写 token 字段（label / 头像不动），加密信封账号（`encrypted=true`）不建号；
+- 档位只做 `cn → ai` 一个方向的纠正（历史版本把国际版存成了国内版）。
+
+**安全**：地址只允许私有网段或回环
+（`127.x` / `10.x` / `192.168.x` / `172.16–31.x` / `169.254.x` / localhost），
+不解析域名，填公网 IP 直接拒绝——token 是长期凭据。
+
+---
+
+# 五、本机账号数据模型（`AccountStore.java`）
+
+App 私有 `SharedPreferences("secure_store")` 的 `sec.wb.accounts`（JSON 数组）。
+v2.0 字段与 fewards `AccountRepository.WorkBuddyAccount` 一一对应；**v2.1 新增 `platform` 字段**。
+
+| 字段 | 单位 | 说明 |
+|:--|:--|:--|
+| `id` / `label` / `uid` / `enterpriseId` / `avatarUrl` | — | 展示与去重 |
+| `platform` | — | **`wb` / `qoder` / `trae`**；缺省按 `wb`（历史数据零迁移） |
+| `variant` | — | `cn` / `ai` |
+| `token` | — | access_token / Qoder token / Trae JWT（明文只存本机） |
+| `refreshToken` | — | WorkBuddy 轮换式；Qoder / Trae 一般为空 |
+| `expiresAt` | **秒** | access 到期；`0 = 未知`，**不能当已过期** |
+| `refreshExpiresAt` | **秒** | refresh 到期；`0 = 未知` |
+| `obtainedAt` | **毫秒** | 拿到这份凭据的时刻，用于比新旧 |
+| `syncVersion` | — | 电脑端维护的单调版本 |
+| `domain` | — | Trae 记录所属 base，防止跨档请求 |
+
+`makeFor(platform, uid, label, token, variant)` 生成 id 前缀按平台 + 档位隔离：
+WorkBuddy 国内 `wb_` / 国际 `wb_ai_`，Qoder / Trae 为 `{platform}_{variant}_`。
+去重顺序：同 `id` → 同 `uid` + `platform` + 档位 → 老账号（uid 空）同 `label` + 档位 → 否则新增；
+命中原地替换。**不要退回"只按 id 去重"**。
+
+JWT 解 profile：`nickname`（trim 控制字符）优先，否则 `preferred_username`；`sub` → uid；
+`exp` → expiresAt；`picture`/`avatar_url` → avatarUrl。**没有头像接口**，不要接腾讯用户资料 API。
+
+---
+
+# 六、手机端接入状态速查
+
+| 能力 | WorkBuddy | Qoder | Trae |
+|:--|:--|:--|:--|
+| 扫码登录 | ✅ 官方 `/v2/plugin/auth/*` | ✅ PKCE + `deviceToken/poll` | ❌ 上游需设备私钥 + 本地回环 |
+| 手动导入 | ✅ 凭据 JSON | ✅ access token / PAT | ✅ `Cloud-IDE-JWT …` |
+| 独立签到 | ✅ 国内版 | ✅ | ✅ |
+| 独立查积分 | ✅ | ✅ 额度 | ✅ 权益包 |
+| 自动签到（`AlarmManager`） | ✅ | ✅ | ✅ |
+| 手机端刷新凭据 | ✅ 轮换式 | ❌ 重新粘贴 | ❌ 重新导出 |
+| 同步到电脑 | ✅ 可选 | — | — |
+
+三者的「一键签到」都经 `PlatformRouter` 汇总：不支持的档位返回 `skipped=true` 并计入跳过数，
+不计入失败、不显示红字。
