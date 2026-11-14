@@ -1,4 +1,4 @@
-# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.1 三平台）
+# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.1.1 三平台）
 
 ## 一段需要纠正的判断
 
@@ -73,6 +73,32 @@ WebView 里的 JS 无法伪造 `Origin` / `Referer` / `User-Agent` / `X-Requeste
 用户最初要求「手机单独登录、同步可选」的方向在 WorkBuddy / Qoder 上完整实现，
 Trae 则在上游允许的范围内做到独立签到与查积分。
 
+## v2.1.1 修正：Qoder 签到「跳过」
+
+用户反馈「qoder 签到提示跳过」。逐文件核对 dev 分支 Rust core 后确认，
+这是**移植时挑错了通道**，不是上游限制：
+
+- v2.1.0 的 `QoderApi.checkinOne` 只调用 `/sash/api/v1/me/daily-check-in/{status,claim}`，
+  并在 404/405/410 时直接 `skipped("该区域暂未开放每日签到接口")`。
+- 而 `qoder/checkin.rs` 模块头明确写着：旧通道**国内版 `DISABLED`、国际版 404**，
+  「每日领取 100 Credits」早已迁到**活动平台** `GET /sash/api/v1/me/campaigns` +
+  `POST …/{id}/claim`。也就是说，v2.1.0 从没调用过真正能领积分的接口。
+
+修正做法（对齐 `checkin.rs::claim_for` → `campaign.rs::checkin_for`）：
+
+1. 活动平台优先：`desktopHeaders`（`cosy-clienttype=10`、`UA=Qoder`、**不发假机器头**）
+   拉活动列表，筛出积分类活动（`benefit.kind` 为 `CREDITS` 或空），
+   按 `classify` 逐条领取；相邻 claim 间隔 1 秒。
+2. 只有活动平台**整区 404/405/410** 且重发一次仍如此，才回落旧通道
+   （issue #66：一次 404 可能只是网关抖动，不能据此断言「本区域没有」）。
+3. **三档语义**：成功 / 未开放（`ok:false + disabled:true`）/ 失败。
+   把「未开放」写成 `ok:true` 会让界面显示「N 个成功」而额度纹丝不动——
+   这是 Rust core `de932d7` 修掉的缺陷，前端与 `JsBridge` 同步改为单独计数与渲染。
+4. 拒绝 `pt-` PAT 调用活动平台（上游限制），引导用户扫码登录取 access token。
+
+> 教训与第一节同源：把「某个端点还在」当成「机制没变」，同样会得出错误结论。
+> 官方把签到从固定端点迁到**活动列表驱动**后，客户端必须跟着读列表，不能继续打老路径。
+
 ## 参考实现 → 本 App 的映射
 
 | 参考实现 | 本 App |
@@ -90,7 +116,9 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
 | `work/TaskWorker.kt` + 控制中心磁贴 | `AutoCheckinReceiver` + AlarmManager |
 | `qoder/oauth.rs` · `qoder/region.rs` | `QoderApi.loginStart/loginPoll` |
 | `qoder/api.rs::openapi_headers` · `qoder/device.rs::derive_id` | `QoderApi.openapiHeaders` |
-| `qoder/api.rs`（check-in / quota） | `QoderApi.checkinOne/creditsOne` |
+| `qoder/checkin.rs::claim_for` · `qoder/campaign.rs::checkin_for` | `QoderApi.checkinOne/checkinViaCampaigns`（v2.1.1） |
+| `qoder/campaign.rs::{parse_campaigns,classify,desktop_headers,claim_campaign,interpret_claim}` | `QoderApi` 同名逻辑 |
+| `qoder/api.rs`（legacy check-in / quota） | `QoderApi.checkinViaLegacy/creditsOne` |
 | `trae/jwt.rs::normalize` · `trae/credits.rs::build_headers` | `TraeApi.addManual` / `buildHeaders` |
 | `trae/checkin.rs` · `trae/credits.rs::parse_credit_packages` | `TraeApi.checkinOne/creditsOne` |
 | （新）三平台能力矩阵与分派 | `Platforms.java` · `PlatformRouter.java` |
@@ -107,6 +135,9 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
 - **Trae 不能独立扫码 OAuth**：上游要求桌面客户端设备私钥与 `127.0.0.1:17388` 回环探测。
   App 提供「粘贴 JWT 导入」，导入后签到/查积分完全独立；JWT 过期需从桌面客户端重新导出一次。
 - **Qoder / Trae 不做手机端凭据刷新**：上游没有对应的移动端刷新端点，App 返回跳过提示，
-  过期后重新粘贴 / 重新导出。
+  过期后重新扫码 / 重新导出。
+- **Qoder 活动平台依赖上游活动列表**：账号没有积分类活动、活动限时、或国际版要求官方原生
+  机器身份时，可能领不到。App 如实显示「未开放」而不是「跳过 / 成功」；`pt-` PAT 不能用于领取。
+  上游每日实例在 10:00（UTC+8）切换。
 
 逐端点契约见 [API-CONTRACT.md](API-CONTRACT.md)，故障排查见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。

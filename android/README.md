@@ -2,16 +2,21 @@
 
 **手机独立完成 WorkBuddy / Qoder / Trae 的登录、签到、领积分、查余额；账号信息同步到电脑是可选的。**
 
-产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 5 / 2.1.0）。
+产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 6 / 2.1.1）。
 
 > ### 版本沿革
 >
 > - **v1.x**：`buddy-switch-server` 的局域网客户端，登录/签到都靠电脑执行（已废弃）。
 > - **v2.0**：参考 [fewards](https://github.com/loma18/fewards) + [workbuddy-console](https://github.com/loma18/workbuddy-console)，
 >   改用 WorkBuddy 官方 `/v2/plugin/auth/*` 扫码协议，手机独立登录与签到。
-> - **v2.1（本次）**：新增 **Qoder 独立扫码登录** 与 **Trae 粘贴 JWT 后独立签到**，
->   协议取自 `qoder-trae-workbuddy-switch` dev 分支的 Rust core。详见
->   [docs/API-CONTRACT.md](docs/API-CONTRACT.md) 与 [docs/PC-TO-MOBILE.md](docs/PC-TO-MOBILE.md)。
+> - **v2.1**：新增 **Qoder 独立扫码登录** 与 **Trae 粘贴 JWT 后独立签到**，
+>   协议取自 `qoder-trae-workbuddy-switch` dev 分支的 Rust core。
+> - **v2.1.1（本次）**：修复 **Qoder 签到提示「跳过」**。v2.1.0 只打已废弃的
+>   `/sash/api/v1/me/daily-check-in/*` 通道，该通道国内版 `DISABLED`、国际版 404，
+>   遇 404 就直接返回 `skipped`。现改为对齐 Rust core `checkin.rs` /
+>   `campaign.rs` 的**活动平台优先**通道：`GET /sash/api/v1/me/campaigns` →
+>   逐条 `POST /{id}/claim` 领取「每日 100 Credits」，旧通道仅在活动平台整区
+>   404/405/410（并重试确认）时兜底。详见 [docs/API-CONTRACT.md](docs/API-CONTRACT.md)。
 
 ## 能做什么
 
@@ -46,6 +51,9 @@
 
 > WorkBuddy 国际版**没有签到 / 成长中心接口**，可登录与查积分，签到自动跳过。
 > Qoder / Trae 的「领积分」不单独存在，签到本身即发放 Credits。
+> Qoder 签到请用**扫码登录**取得的 access token；`pt-` 开头的 PAT 只能查额度，
+> 上游不允许用于活动平台领取。若活动列表里没有积分类活动，界面如实显示「未开放」
+> 而不是「跳过」或「成功」（不会谎报领取）。
 
 **可选同步**：「同步」页填电脑局域网 IP / 端口（默认 57900）/ 配对码 → 测试连接 →
 推送账号。协议与 workbuddy-console 的 `server/lansync/*` 一致。不填、不点，App 完全正常工作。
@@ -70,7 +78,7 @@ assets/index.html  ←→  JsBridge.call(cbId, action, args)  ←→  PlatformRo
 | `assets/index.html` | SPA：首页 / 账号（平台筛选）/ 同步 / 设置，内嵌自研二维码编码器 |
 | `src/.../Platforms.java` | 三平台能力矩阵、标签、是否支持扫码 |
 | `src/.../PlatformRouter.java` | 按账号平台分派签到 / 领积分 / 查额度 / 刷新 |
-| `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、签到、额度 |
+| `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、活动平台签到（campaigns + claim）、额度 |
 | `src/.../TraeApi.java` | Trae JWT 解析与导入、签到、权益包聚合 |
 | `src/.../WorkBuddyApi.java` | WorkBuddy 登录、签到、成长中心、积分、刷新、lansync |
 | `src/.../WbVariant.java` | WorkBuddy 国内 / 国际档位域名与指纹头 |
@@ -101,7 +109,7 @@ ALLOW_REBUILD=1 ./build.sh       # 同一 versionCode 内只改资源 / SPA 时�
 | 版本号单一数据源 | `build.sh` 从 `AndroidManifest.xml` 读取，不再硬编码 |
 | 依次升号 | 已有 `dist/agent.apk` 时要求新 `versionCode` 严格大于旧值，否则拒绝构建 |
 
-当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）均可直接覆盖安装**；
+当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）→ v2.1.1（6）均可直接覆盖安装**；
 v1.x 的私钥已永久丢失，那两个历史版本升级需卸载最后一次。
 换机 / 重新 clone 后构建必须带上整个 `signing/` 目录，详见 [signing/README.md](signing/README.md)。
 

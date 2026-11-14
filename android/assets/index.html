@@ -283,7 +283,7 @@ textarea{resize:vertical;line-height:1.5}
       </div>
       <div class="card">
         <div class="sec-t">关于</div>
-        <div class="kv"><span>版本</span><b id="verText">2.1.0</b></div>
+        <div class="kv"><span>版本</span><b id="verText">2.1.1</b></div>
         <div class="kv"><span>运行形态</span><b>三平台独立客户端（本机账号库）</b></div>
         <div class="kv"><span>上游协议</span><b>fewards / workbuddy-console / switch core</b></div>
         <div class="kv"><span>凭据存储</span><b>App 私有 SharedPreferences</b></div>
@@ -380,7 +380,7 @@ var S = { cfg:{}, accounts:[], stats:{}, credits:{}, tab:'home', oauth:null, pol
           addPlatform:'wb', addVariant:'cn', filterPlatform:'all', lastReport:null };
 var PLATFORMS=[
   {id:'wb',label:'WorkBuddy',qr:true,growth:true,note:'手机独立扫码授权（fewards 协议）'},
-  {id:'qoder',label:'Qoder',qr:true,growth:false,note:'PKCE 设备授权，纯 HTTP 轮询，手机可独立登录'},
+  {id:'qoder',label:'Qoder',qr:true,growth:false,note:'PKCE 设备授权纯 HTTP 轮询；签到走官方活动平台领取 100 Credits（PAT 不可用，请扫码登录）'},
   {id:'trae',label:'Trae',qr:false,growth:false,note:'上游需桌面客户端设备私钥与本地回环；粘贴 JWT 导入后即可独立签到 / 查积分'}
 ];
 function platformMeta(p){ for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].id===p) return PLATFORMS[i]; return PLATFORMS[0]; }
@@ -445,7 +445,7 @@ function demoAccounts(){ return DEMO.accounts.map(function(a){
   var o={}; for(var k in a) o[k]=a[k]; return o; }); }
 function demo(action,a){
   var P=function(o){ return o; };
-  if(action==='state') return {ok:true,version:'2.1.0',sdk:34,demo:DEMO.demo,
+  if(action==='state') return {ok:true,version:'2.1.1',sdk:34,demo:DEMO.demo,
     autoCheckin:DEMO.autoCheckin,intervalMin:DEMO.intervalMin,notify:DEMO.notify,
     sync:DEMO.sync,accounts:demoAccounts(),
     stats:{total:DEMO.accounts.length,
@@ -510,17 +510,18 @@ function demo(action,a){
       enterpriseId:'',avatarUrl:'',syncVersion:0});
     return {ok:true,count:1,message:'已导入（演示）'};
   }
-  if(action==='checkin'||action==='growth'){
-    var pick=(a&&a.ids&&a.ids.length)?DEMO.accounts.filter(function(x){return a.ids.indexOf(x.id)>=0}):DEMO.accounts;
-    var items=pick.map(function(x){
-      var pf=platformOf(x), skip=false, detail='';
-      if(action==='checkin'){
-        skip=(pf==='wb' && x.variant==='ai');
-        detail=skip?'WorkBuddy 国际版暂无签到接口，已跳过'
-          :(pf==='qoder'?'Qoder 每日签到完成，+100 Credits'
-          :(pf==='trae'?'Trae 签到领积分完成，+150 Credits':'领取成功 +10 积分，连签 7 天'));
-        var r={ok:true,already:false,skipped:skip,detail:detail};
-      } else {
+    if(action==='checkin'||action==='growth'){
+      var pick=(a&&a.ids&&a.ids.length)?DEMO.accounts.filter(function(x){return a.ids.indexOf(x.id)>=0}):DEMO.accounts;
+      var items=pick.map(function(x){
+        var pf=platformOf(x), skip=false, detail='', parts=null;
+        if(action==='checkin'){
+          skip=(pf==='wb' && x.variant==='ai');
+          detail=skip?'WorkBuddy 国际版暂无签到接口，已跳过'
+            :(pf==='qoder'?'活动领取成功 +100 Credits（1 项）'
+            :(pf==='trae'?'Trae 签到领积分完成，+150 Credits':'领取成功 +10 积分，连签 7 天'));
+          if(pf==='qoder') parts=['领取成功 +100 Credits · 每日领取 100 Credits','下次可领 10:00（UTC+8）'];
+          var r={ok:true,already:false,skipped:skip,detail:detail,parts:parts};
+        } else {
         skip=(pf!=='wb' || x.variant==='ai');
         detail=skip?(pf==='wb'?'国际版暂无成长中心，已跳过':'该平台没有成长中心，签到即领积分')
                    :'领取完成：成功 4 项，累计 +35 积分';
@@ -624,7 +625,7 @@ function render(){
   $('#sCredits').textContent=sum==null?'—':Math.round(sum);
   $('#hdBadge').className='badge'+(S.cfg.demo?' demo':'');
   $('#hdBadge').textContent=S.cfg.demo?'演示模式':'本机独立运行';
-  $('#verText').textContent='2.1.0'+(BROWSER?' · 浏览器预览':'');
+  $('#verText').textContent='2.1.1'+(BROWSER?' · 浏览器预览':'');
   $('#swAuto').checked=!!S.cfg.autoCheckin;
   $('#swNotify').checked=!!S.cfg.notify;
   $('#swDemo').checked=!!S.cfg.demo;
@@ -690,23 +691,31 @@ function accCard(a){
       '<button class="btn sm dan" onclick="App.remove(\''+esc(a.id)+'\')">删除</button>'+
     '</div></div>';
 }
+/* 三档语义：成功 / 跳过 / 未开放(disabled) / 失败。
+   「未开放」既不是成功也不是失败，用警示色单独呈现，别再谎报「N 个成功」。 */
+function resultState(x){
+  if(x.disabled) return {label:'未开放',cls:'tag-warn',dot:'var(--warn)',good:true};
+  if(x.skipped)  return {label:'跳过',  cls:'tag-warn',dot:'var(--warn)',good:true};
+  if(x.ok)       return {label:'成功',  cls:'tag-ok',  dot:'var(--ok)',  good:true};
+  return            {label:'失败',  cls:'tag-err', dot:'var(--err)', good:false};
+}
+function renderResultItem(it){
+  var x=it.result||{}, st=resultState(x);
+  var detail=x.detail||x.report||x.message||x.error||'';
+  var extra='';
+  if(x.parts&&x.parts.length) extra=x.parts.map(function(p){return '· '+esc(p);}).join('<br>');
+  return '<div class="item"><div class="dot" style="background:'+st.dot+'"></div>'+
+    '<div class="tx"><b>'+esc(it.label||it.id)+'</b> <span class="'+st.cls+'">'+
+    st.label+'</span><small>'+esc(detail)+
+    (extra?'<br>'+extra:'')+'</small></div></div>';
+}
 function renderHomeResult(){
   var r=S.lastReport;
   if(!r){ return; }
   var when=r.at?new Date(r.at).toLocaleString('zh-CN',{hour12:false}):'';
   $('#lastAt').textContent=when;
   var items=r.items||[];
-  var html=items.map(function(it){
-    var x=it.result||{}, ok=x.ok||x.skipped, cls=ok?'tag-ok':'tag-err';
-    var detail=x.detail||x.report||x.message||x.error||'';
-    var extra='';
-    if(x.parts&&x.parts.length) extra=x.parts.map(function(p){return '· '+esc(p);}).join('<br>');
-    return '<div class="item"><div class="dot" style="background:'+(ok?'var(--ok)':'var(--err)')+'"></div>'+
-      '<div class="tx"><b>'+esc(it.label||it.id)+'</b> <span class="'+cls+'">'+
-      (x.skipped?'跳过':(ok?'成功':'失败'))+'</span><small>'+esc(detail)+
-      (extra?'<br>'+extra:'')+'</small></div></div>';
-  }).join('');
-  $('#homeResult').innerHTML=html||'<div class="hint">无结果</div>';
+  $('#homeResult').innerHTML=items.map(renderResultItem).join('')||'<div class="hint">无结果</div>';
 }
 function loadLog(){
   native('getLog').then(function(r){
@@ -743,10 +752,10 @@ function sheet(kind){
   if(kind==='addAccount'){
     var pf=S.addPlatform, v=S.addVariant, meta=platformMeta(pf);
     var ph = pf==='trae' ? '粘贴 Trae JWT（可带 Cloud-IDE-JWT 前缀）'
-           : (pf==='qoder' ? '粘贴 Qoder access token / PAT'
+           : (pf==='qoder' ? '粘贴 Qoder access token（PAT 不能用于活动签到）'
                            : '粘贴 JWT；也可粘贴 [{uid,label,token,variant}] 批量导入');
     var credLabel = pf==='trae' ? 'Trae JWT'
-                  : (pf==='qoder' ? 'Qoder access token / PAT' : 'access_token 或凭据 JSON');
+                  : (pf==='qoder' ? 'Qoder access token' : 'access_token 或凭据 JSON');
     h+='<h2>添加账号</h2><p class="desc">凭据只存这台手机，签到与领取直连各平台官方接口，不需要电脑。</p>'+
       '<div class="seg">'+PLATFORMS.map(function(p){
         return '<button id="p'+p.id+'" class="'+(pf===p.id?'on':'')+'" onclick="App.setPlatform(\''+p.id+'\')">'+p.label+'</button>';
@@ -756,6 +765,7 @@ function sheet(kind){
       '<div class="hint" style="margin-top:0">'+esc(meta.note)+
       (v==='ai' && pf==='wb' ? '<br><span style="color:var(--warn)">WorkBuddy 国际版暂无签到 / 成长中心接口，可登录与查积分，签到会自动跳过。</span>' : '')+
       (pf==='trae' ? '<br><span style="color:var(--warn)">Trae 的签到 / 积分接口只需 JWT + 自造设备头：导入后可长期独立签到、领积分、查余额。</span>' : '')+
+      (pf==='qoder' ? '<br><span style="color:var(--warn)">签到请用「发起登录」扫码取得 access token；PAT 只能查额度，不能用于活动平台签到。</span>' : '')+
       '</div><div class="line"></div>'+
       (meta.qr
         ? '<div class="sec-t">方式一 · 扫码授权登录</div>'+
@@ -788,13 +798,7 @@ function sheet(kind){
   if(kind==='report'){
     var r=S.lastReport; var el=$('#reportBox');
     if(el&&r){
-      el.innerHTML=(r.items||[]).map(function(it){
-        var x=it.result||{},ok=x.ok||x.skipped;
-        var parts=(x.parts||[]).map(function(p){return '<div class="hint" style="margin:2px 0">· '+esc(p)+'</div>';}).join('');
-        return '<div class="item"><div class="dot" style="background:'+(ok?'var(--ok)':'var(--err)')+'"></div>'+
-          '<div class="tx"><b>'+esc(it.label||it.id)+'</b> <span class="'+(ok?'tag-ok':'tag-err')+'">'+
-          (x.skipped?'跳过':(ok?'成功':'失败'))+'</span><small>'+esc(x.detail||x.report||x.error||'')+'</small>'+parts+'</div></div>';
-      }).join('');
+      el.innerHTML=(r.items||[]).map(renderResultItem).join('');
     }
   }
 }
@@ -931,11 +935,17 @@ var App={
         var g=(b.items||[])[i];
         var x=it.result||{};
         var gx=g?g.result||{}:{};
-        var parts=(gx.parts||[]).slice(0,4);
+        // 签到明细（活动领取 +100 Credits 等）与成长明细都要展示
+        var parts=(x.parts||[]).slice(0,4).concat((gx.parts||[]).slice(0,4));
         if(gx.creditsGained) parts.push('本次成长中心累计 +'+gx.creditsGained+' 积分');
+        var detail=(x.detail||x.message||x.error||'')+(gx.report||gx.message?' · '+(gx.report||gx.message):'');
         return {id:it.id,label:it.label,result:{
-          ok:x.ok&&(gx.ok||gx.skipped),skipped:x.skipped&&gx.skipped,
-          detail:(x.detail||'')+(gx.report?' · '+gx.report:''),parts:parts}};
+          ok:x.ok||x.skipped||x.disabled,
+          skipped:x.skipped&&!x.disabled,
+          disabled:!!x.disabled,
+          already:!!x.already,
+          earned:(x.earned||0)+(gx.creditsGained||0),
+          detail:detail,parts:parts}};
       });
       S.lastReport={at:Date.now(),items:items};
       renderHomeResult(); sheet('report');

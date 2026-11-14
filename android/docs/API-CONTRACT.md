@@ -235,12 +235,122 @@ Referer: {website}/
 
 `uid` 为空时用 `anonymous` 兜底，避免生成空串机器码。
 
-## 4. 每日签到（签到即领积分）
+## 4. 每日签到 / 领积分（**活动平台优先**，v2.1.1 修正）
 
-| 动作 | 端点 | 要点 |
+> ⚠️ **v2.1.0 的缺陷**：只调用旧 `/sash/api/v1/me/daily-check-in/*`，
+> 遇 404/405/410 就返回 `skipped`「该区域暂未开放」——这就是用户看到的「跳过」。
+> 而 Rust core `qoder/checkin.rs` 模块头明确写着：
+>
+> | 通道 | 端点 | 现状 |
+> |:--|:--|:--|
+> | **活动平台（主力）** | `GET /sash/api/v1/me/campaigns` + `POST …/{id}/claim` | 官方现行机制，「每日领取 100 Credits」在这里 |
+> | 旧签到通道（兜底） | `/sash/api/v1/me/daily-check-in/*` | 实测**国内版 `DISABLED`、国际版 404**，只在仍开放时可用 |
+>
+> ⇒ 顺序固定：**先活动平台**；只有它**整区不可用**（404/405/410）时才回落旧通道，
+> 且按 issue #66 先原样重发一次确认（一次 404 可能只是网关抖动）。旧通道返回
+> `DISABLED` 也**不**再回退——那是「活动关着」，不是「通道不存在」。
+
+### 4.1 活动平台请求头（`desktopHeaders`，对齐 `campaign.rs::desktop_headers`）
+
+> 与第 3 节 `openapiHeaders` **不同**，别混用。
+
+```
+Content-Type: application/json
+Accept: application/json, text/plain, */*
+User-Agent: Qoder                       ← 不是 QoderWork/1.1.64
+Authorization: Bearer {token}
+X-Request-ID: md5("req:"+uid) + "-" + 6位尾数
+X-Machine-ID: md5("machine:"+uid)
+X-Session-ID: md5("session:"+uid)
+Origin: {website}
+Referer: {website}/
+cosy-clienttype: 10                    ← 桌面端身份
+cosy-version: 0.4.3
+```
+
+> ★ **刻意不发 `cosy-machine*` 头**：手机没有官方原生机器身份，发派生假头会被服务端
+> 判定为非官方客户端，把 `CLAIMABLE` 的「每日领取 100 Credits」**整条过滤掉**，比不发更糟。
+> 国际版服务端可能要求真实机器身份，此时活动列表可能不可见，属已知上游限制。
+>
+> ★ **`pt-` 开头的 PAT 不能用于活动平台**（`campaign.rs::access_token_for`），
+> 只能查额度。签到必须扫码登录取 access token。
+
+### 4.2 查活动列表
+
+`GET {openapi}/sash/api/v1/me/campaigns`
+
+| 响应 | 判定 |
+|:--|:--|
+| `404/405/410` | 整区没有活动平台 → 重发一次确认 → 仍如此才回落旧通道 |
+| 其它非 2xx | 失败，展示 HTTP 状态 |
+| 2xx | 取 `campaigns[]`（也可能包在 `data` 下）；缺数组即失败 |
+
+单条活动字段（兼容 camelCase / snake_case）：
+
+| 字段 | 说明 |
+|:--|:--|
+| `campaignId` / `campaignKey` | 领取路径用的 id；两者至少有一个 |
+| `claimStatus` | `CLAIMABLE` / `CLAIMED` / 其它 |
+| `actionType` | `CLAIM_BENEFIT` / `VIEW_DETAILS` / 空 |
+| `benefit.kind` | **`CREDITS` 或空** = 积分类（空 kind 是老活动，实测「每日领取 100 Credits」就是空） |
+| `benefit.amount` | 奖励额度，可能是浮点 `100.0` |
+| `unavailableReason` | `REDEMPTION_CODE_OUT_OF_STOCK` / `ACHIEVEMENT_NOT_COMPLETED` / … |
+| `achievementCompleted` | 新人任务是否完成 |
+| `placements[].content.zh.title` | 中文标题 → 英文 → campaignKey → id 兜底 |
+
+**归类顺序（`campaign.rs::classify`，★ 不可调换）**：先判 `CLAIMED` 再过滤 `actionType`
+—— 上游领取后会把 `actionType` 降级为 `VIEW_DETAILS`，先过滤就会把「已领」误判成
+「暂无可领活动」。
+
+| 归类 | 判据 | 处置 |
 |:--|:--|:--|
-| 查状态 | `GET {openapi}/sash/api/v1/me/daily-check-in/status` | `404/405/410` = 该区域暂未开放（Qoder 已改活动领积分），**跳过**；`checked_in`/`checkedIn`/`claimed`/`status=CLAIMED|CHECKED|DONE` = 今日已签 |
-| 领取 | `POST {openapi}/sash/api/v1/me/daily-check-in/claim`，body `{}` | 非 2xx 但响应含 `already`/`checked`/`已签` 也算今日已签 |
+| Already | `CLAIMED` 且（amount>0 或 actionable） | 今日已领，成功档 |
+| View | 非 actionable / `CLAIMED` 但无奖励 | 跳过，不参与领取 |
+| Pending | 非 `CLAIMABLE` 且 reason=`REDEMPTION_CODE_OUT_OF_STOCK` | 名额发完 |
+| Locked | reason=`ACHIEVEMENT_NOT_COMPLETED` 或 `achievementCompleted=false` | 需先完成新人任务 |
+| Claimable | `CLAIMABLE` 且 actionable | 发起领取 |
+
+### 4.3 领取
+
+`POST {openapi}/sash/api/v1/me/campaigns/{id}/claim`，body `{}`，头同 4.1。
+官方幂等；相邻两次 claim 间隔 ≥1 秒防风控。
+
+| 响应 | 判定 |
+|:--|:--|
+| HTTP `409` | 今日已领（幂等确认），成功档 |
+| 非 2xx 且 `errorCode` = `ALREADY_CLAIMED` / `REPLAYED` | 今日已领，成功档 |
+| 其它非 2xx | 失败 |
+| 2xx `failureCode=SAME_PERSON_ALREADY_CLAIMED` 或 `status=BLOCKED` | 同人已领（同机其它账号本轮领过），不算失败也不算成功 |
+| 2xx `success=false` 且无 status | 失败，展示 `error` |
+| 2xx `status` ∈ `CLAIMED`/`GRANTED`/`SUCCESS` | 领取成功，累计 `benefit.amount` |
+| 2xx `replayed=true` | 今日已领 |
+
+已知失败码（`FAILURE_REASONS`，**仅用于展示，判据永远是 claimStatus/actionType**）：
+`REDEMPTION_CODE_OUT_OF_STOCK`（名额发完）/ `ACHIEVEMENT_NOT_COMPLETED`（新人任务）/
+`CAMPAIGN_NOT_ACTIVE`（活动已结束）/ `RISK_BLOCKED`（风控）/ `RISK_DEPENDENCY_UNAVAILABLE`。
+
+### 4.4 三档语义（★ 红线，不许回退）
+
+| 档 | 判据 | 出口 |
+|:--|:--|:--|
+| 成功 | 真领到 / 今日已领 | `ok:true` |
+| **未开放** | 列表里**根本没有积分类活动**，或整区无活动平台 | `ok:false` + `disabled:true` |
+| 失败 | 上游报错 / 网络失败 | `ok:false` |
+
+> 把「未开放」写成 `ok:true` 会让界面显示「N 个成功」而额度纹丝不动——
+> 这是 Rust core `de932d7` 修掉的缺陷（issue #46-D / #58 §6）。
+> 前端把 `disabled` 单独渲染为「未开放」（警示色），`JsBridge` 也不把它计入成功或失败数。
+
+返回明细：`claimed` / `already` / `blocked` / `pending` / `locked` / `earned` /
+`creditsGained` / `message` / `parts`（逐条活动文案）/ `nextAvailableNote`。
+**上游每日实例在 10:00（UTC+8）切换**，窗口 10:00 → 次日 09:59。
+
+### 4.5 旧通道兜底
+
+仅活动平台整区不可用时走 `GET/POST /sash/api/v1/me/daily-check-in/{status,claim}`：
+`status=DISABLED` → `disabled`（**不是 skipped**）；`CLAIMED`/`checked_in` → 今日已签；
+`CLAIMABLE` → POST claim。响应 `success=false` 时**复查一次状态**（上游可能先扣后报错）。
+`rewardCredits` 可能是 `100.0`，必须按浮点解析，否则「签到成功却报 +0」。
 
 ## 5. 额度查询
 
@@ -401,12 +511,15 @@ JWT 解 profile：`nickname`（trim 控制字符）优先，否则 `preferred_us
 | 能力 | WorkBuddy | Qoder | Trae |
 |:--|:--|:--|:--|
 | 扫码登录 | ✅ 官方 `/v2/plugin/auth/*` | ✅ PKCE + `deviceToken/poll` | ❌ 上游需设备私钥 + 本地回环 |
-| 手动导入 | ✅ 凭据 JSON | ✅ access token / PAT | ✅ `Cloud-IDE-JWT …` |
-| 独立签到 | ✅ 国内版 | ✅ | ✅ |
+| 手动导入 | ✅ 凭据 JSON | ✅ access token（PAT 不能签到） | ✅ `Cloud-IDE-JWT …` |
+| 独立签到 | ✅ 国内版 | ✅ 活动平台 campaigns（v2.1.1） | ✅ |
 | 独立查积分 | ✅ | ✅ 额度 | ✅ 权益包 |
 | 自动签到（`AlarmManager`） | ✅ | ✅ | ✅ |
-| 手机端刷新凭据 | ✅ 轮换式 | ❌ 重新粘贴 | ❌ 重新导出 |
+| 手机端刷新凭据 | ✅ 轮换式 | ❌ 重新扫码 | ❌ 重新导出 |
 | 同步到电脑 | ✅ 可选 | — | — |
 
-三者的「一键签到」都经 `PlatformRouter` 汇总：不支持的档位返回 `skipped=true` 并计入跳过数，
-不计入失败、不显示红字。
+三者的「一键签到」都经 `PlatformRouter` 汇总。**结果分三档**：
+- 不支持的档位（WorkBuddy 国际版、Qoder/Trae 的成长中心）返回 `skipped=true`，显示「跳过」；
+- Qoder 活动列表没有积分类活动时返回 `ok:false + disabled=true`，显示「**未开放**」——
+  `JsBridge` 单独计 `disabledCount`，不计入成功、也不计入失败，**绝不谎报「N 个成功」**；
+- 真领取成功 / 今日已领返回 `ok:true`，并显示逐条活动明细与 `+N Credits`。

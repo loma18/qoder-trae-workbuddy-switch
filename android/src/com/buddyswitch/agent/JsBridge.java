@@ -147,7 +147,7 @@ public final class JsBridge {
     private JSONObject forEach(JSONArray ids, String what) {
         JSONArray all = AccountStore.load(ctx);
         JSONArray items = new JSONArray();
-        int okN = 0, failN = 0;
+        int okN = 0, failN = 0, disabledN = 0;
         for (int i = 0; i < all.length(); i++) {
             JSONObject acc = all.optJSONObject(i);
             if (acc == null) continue;
@@ -168,15 +168,22 @@ public final class JsBridge {
             } catch (Exception ignored) { }
             items.put(item);
             boolean good = r.optBoolean("ok", false) || r.optBoolean("skipped", false);
-            if (good) okN++; else failN++;
+            // 第三档「未开放」（Qoder 活动平台整区不可用 / 账号无积分类活动）：
+            // 既不算成功，也不算失败 —— 单独计数，避免界面谎报「N 个成功」。
+            boolean disabled = r.optBoolean("disabled", false);
+            if (good) okN++;
+            else if (!disabled) failN++;
+            else disabledN++;
         }
         JSONObject out = new JSONObject();
         try {
             out.put("ok", failN == 0).put("items", items).put("okCount", okN)
-                    .put("failCount", failN).put("at", System.currentTimeMillis());
+                    .put("failCount", failN).put("disabledCount", disabledN)
+                    .put("at", System.currentTimeMillis());
             if ("checkin".equals(what)) {
                 Prefs.put(ctx, Prefs.K_LAST_CHECKIN, out.toString());
-                Prefs.log(ctx, "签到完成：成功 " + okN + " / 失败 " + failN);
+                Prefs.log(ctx, "签到完成：成功 " + okN + " / 失败 " + failN
+                        + " / 未开放 " + disabledN);
             } else if ("growth".equals(what)) {
                 Prefs.put(ctx, Prefs.K_LAST_GROWTH, out.toString());
                 Prefs.log(ctx, "成长中心领取完成：成功 " + okN + " / 失败 " + failN);
