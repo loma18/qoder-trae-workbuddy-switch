@@ -165,6 +165,7 @@ public final class TraeApi {
         if (packs == null) return fail("积分响应缺少 user_entitlement_pack_list");
 
         double total = 0, used = 0, remaining = 0;
+        double baseTotal = 0, baseRem = 0, addonTotal = 0, addonRem = 0;
         long expireAt = 0;
         JSONArray outPacks = new JSONArray();
         for (int i = 0; i < packs.length(); i++) {
@@ -181,10 +182,22 @@ public final class TraeApi {
             total += limit; used += amount; remaining += rem;
             long exp = p.optLong("expire_time", 0L);
             if (exp > 0 && (expireAt == 0 || exp < expireAt)) expireAt = exp;
+            // 线上真实形状：包名在 pack 顶层（group_name / display_desc），
+            // entitlement_base_info 里只有 quota 与时间字段（core trae/credits.rs 实测）。
+            String name = firstNonEmpty(p, "group_name", "display_desc", "package_name", "name");
+            if (name.isEmpty()) name = firstNonEmpty(info, "package_name", "name");
+            if (name.isEmpty()) name = "积分包";
+            // 月度 / 基础 / 免费包归「每月赠送基础 Credits」，其余归资源包。
+            boolean base = name.contains("月度") || name.contains("月卡") || name.contains("基础")
+                    || name.contains("免费") || name.contains("赠送");
+            String kind = base ? "base" : "addon";
+            if (base) { baseTotal += limit; baseRem += rem; }
+            else { addonTotal += limit; addonRem += rem; }
             JSONObject op = new JSONObject();
             try {
-                op.put("name", firstNonEmpty(info, "package_name", "name"));
-                putIf(op, "code", firstNonEmpty(info, "package_code", "package_type"));
+                op.put("name", name).put("kind", kind);
+                putIf(op, "code", firstNonEmpty(p, "package_code", "package_type", "entitlement_id"));
+                if (op.optString("code", "").isEmpty()) putIf(op, "code", firstNonEmpty(info, "package_code", "package_type"));
                 putIf(op, "total", limit);
                 putIf(op, "remaining", rem);
                 putIf(op, "used", amount);
@@ -196,7 +209,10 @@ public final class TraeApi {
         try {
             out.put("ok", true).put("total", total).put("used", used)
                     .put("remaining", remaining).put("unit", "credits")
+                    .put("baseTotal", baseTotal).put("baseRemaining", baseRem)
+                    .put("addonTotal", addonTotal).put("addonRemaining", addonRem)
                     .put("packages", outPacks).put("expireAt", expireAt > 0 ? expireAt * 1000 : 0)
+                    .put("source", "ide_user_ent_usage")
                     .put("platform", Platforms.TRAE).put("variant", v);
         } catch (Exception ignored) { }
         return out;

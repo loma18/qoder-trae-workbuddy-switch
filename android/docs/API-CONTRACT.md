@@ -1,4 +1,4 @@
-# 官方 API 契约（v2.1.2 · WorkBuddy / Qoder / Trae 三平台独立版）
+# 官方 API 契约（v2.2.0 · WorkBuddy / Qoder / Trae 三平台独立版）
 
 > 本 App 的 Java 层逐条实现以下端点，全部由手机直连官方域名，**不经过电脑**。
 > - WorkBuddy：来自 [fewards](https://github.com/loma18/fewards) `core/workbuddy/*` / `core/lansync/*`，
@@ -131,6 +131,14 @@ X-Enterprise-Id / X-Tenant-Id: {enterpriseId}  （有则带）
 - `data.Packages[]` 为**权威数额**：`CycleTotalCapacity` / `CycleRemainCapacity` / `CycleUsedCapacity` / `PackageCode` / `CapacityUnit`。
 - 明细端点 `get-user-resource-paid-packages` / `get-user-resource-free-packages` 只用于补到期时间，
   **不要把逐笔历史相加**（会与周期口径重复计算）。
+- **v2.2.0**：为把「每月赠送的基础 Credits」单独查出来，`enrichFreePackages` 额外 POST
+  `get-user-resource-free-packages`（body 带当天 `SlicePeriodStartTime/EndTime` +
+  `FREE_PACKAGE_CODES`，对齐 core `credits.rs::free_packages_body`），把免费月度包标为
+  `kind:'base'`，summary 的其余包标为 `kind:'addon'`，按 `PackageCode` 去重。
+  **汇总 `total/remaining` 仍以 summary 为权威、绝不重算**（两路口径可能重叠），
+  只额外给出 `baseTotal/baseRemaining/addonTotal/addonRemaining` 与 `packages[]` 明细；
+  接口失败或返回空时退化成按包名（免费 / 赠送 / 月度 / 基础 / `free`）识别，并在
+  `baseHint` 如实说明「未取到独立明细」，绝不假装查到了。
 - 包到期取「还有额度的那几笔里最早的」；`DeductionEndTime` 比 `CycleEndTime` 晚整 30 天视为长期占位。
 - 汇总接口不含到期字段时，界面如实显示「未知」，不要伪造 1970。
 
@@ -356,10 +364,41 @@ cosy-version: 0.4.3
 `CLAIMABLE` → POST claim。响应 `success=false` 时**复查一次状态**（上游可能先扣后报错）。
 `rewardCredits` 可能是 `100.0`，必须按浮点解析，否则「签到成功却报 +0」。
 
-## 5. 额度查询
+## 5. 额度查询（v2.2.0：拆分「每月基础 Credits」与「资源包」）
 
 `GET {openapi}/api/v2/quota/usage`，响应取 `userQuota` + `addOnQuota` 两个对象，
 各自累加 `remaining` / `used` / `total`，单位 `credits`。两者都缺即视为响应异常。
+
+> 上游 `core/qoder/api.rs::parse_quota` 与 `core/qoder/web_usage.rs` 的实测样本说明：
+> **`userQuota` = 套餐 / 每月赠送的基础 Credits（PLAN，按 `nextResetAt` 月度重置）**，
+> **`addOnQuota` = 赠送 / 加购资源包（BONUS）**。v2.1 只把两者相加给一个笼统合计，
+> 用户看不到「每月赠送的基础 credits」，v2.2 起必须分开。
+
+`creditsOne` 返回（新增字段全部向后兼容，旧字段语义不变）：
+
+| 字段 | 说明 |
+|:--|:--|
+| `total` / `used` / `remaining` / `unit` | 聚合值（= 基础 + 资源包） |
+| `baseTotal` / `baseRemaining` | 每月赠送基础 Credits（`userQuota`） |
+| `addonTotal` / `addonRemaining` | 资源包 / 加购（`addOnQuota`） |
+| `packages[]` | `{name, code, kind:'base'\|'addon', total, used, remaining, expireAt}` |
+| `source` | `quota/usage`（主通道）或 `web-usage`（拿到网页端逐包明细） |
+| `nextResetAt` / `lastResetAt` / `planName` | 可选，来自网页端逐包接口 |
+
+**附加通道（尽力而为，绝不拖累主结果）**：
+`GET {website}/api/v2/me/usages/big_model_credits`（core `web_usage.rs` 的
+`PATH_WEB_USAGE_CREDITS`），返回 `plan_quota` / `resource_package_quota` /
+`dedicated_resource_package_quota` 三个分组，各带 `quota_summary`
+（`limit_value` / `used_value` / `remaining_value`）与 `quota_detail[]`
+（`source: PLAN | RESOURCE_PACKAGE_SOURCE_BONUS`、`expires_at` 秒或毫秒混用、
+`status: ACTIVE | EXPIRED`），以及 `lastResetAt` / `nextResetAt`。
+
+- 该接口**只认浏览器会话 Cookie**（core 实测 Bearer 一律 401），手机只有 Bearer token，
+  因此这里用 Bearer **短超时试一次**：拿到合法 JSON 分组就用它覆盖 base/addon 与逐包明细；
+  401/403 / SPA HTML fallback / 解析不出分组一律**静默回落** `quota/usage` 的拆分结果，
+  `source` 保持 `quota/usage`，绝不把附加请求失败写成 0 或让主查询失败。
+- `total_quota` 是**汇总**不是分组，不解析（否则 PLAN 包会重复出现）。
+- 过期包（`status=EXPIRED`）不进明细。
 
 ---
 
@@ -469,6 +508,12 @@ sec-fetch-site: none
 `entitlement_base_info.quota.credits_limit` 减 `usage.credits_amount` 得剩余；
 聚合 `total` / `used` / `remaining`，到期取还有额度的包里最早的 `expire_time`（秒，输出时 ×1000）。
 
+> **v2.2.0**：包名在 **pack 顶层** `group_name` / `display_desc`
+> （core `trae/credits.rs` 线上实测，`entitlement_base_info` 里只有 quota 与时间字段），
+> 旧版只从 `info` 取会拿到空名。现按 `group_name → display_desc → package_name → name` 回退，
+> 并按名称含「月度 / 月卡 / 基础 / 免费 / 赠送」标为 `kind:'base'`（每月赠送基础 Credits），
+> 其余标 `kind:'addon'`（资源包），同时给出 `baseTotal/baseRemaining/addonTotal/addonRemaining`。
+
 > Trae / Qoder 都**不提供手机端刷新**：`refreshOne()` 返回跳过提示，JWT / token 过期后需重新导出粘贴。
 
 ---
@@ -523,11 +568,13 @@ push body：
 # 五、本机账号数据模型（`AccountStore.java`）
 
 App 私有 `SharedPreferences("secure_store")` 的 `sec.wb.accounts`（JSON 数组）。
-v2.0 字段与 fewards `AccountRepository.WorkBuddyAccount` 一一对应；**v2.1 新增 `platform` 字段**。
+v2.0 字段与 fewards `AccountRepository.WorkBuddyAccount` 一一对应；**v2.1 新增 `platform`**，
+**v2.2 新增 `remark`**（历史数据缺字段按空串处理，零迁移）。
 
 | 字段 | 单位 | 说明 |
 |:--|:--|:--|
 | `id` / `label` / `uid` / `enterpriseId` / `avatarUrl` | — | 展示与去重 |
+| `remark` | — | **v2.2**：用户自定义备注，最多 60 字，只存本机；`AccountStore.setRemark()` 单独写入，刷新 / 同步 / 重新扫码的瘦数据不覆盖（空值时从旧记录保留） |
 | `platform` | — | **`wb` / `qoder` / `trae`**；缺省按 `wb`（历史数据零迁移） |
 | `variant` | — | `cn` / `ai` |
 | `token` | — | access_token / Qoder token / Trae JWT（明文只存本机） |
@@ -569,3 +616,46 @@ JWT 解 profile：`nickname`（trim 控制字符）优先，否则 `preferred_us
 
 > 单个「查积分」也支持 `disabled`：v2.1.2 起 `App.credits` 对非成功结果打开报告页完整展示诊断，
 > 不再被 toast 截断成一句「查询失败」。
+
+---
+
+# 七、v2.2.0 新增契约（UI / 本机能力，不涉及上游新端点）
+
+## 7.1 Qoder 去掉「领积分」按钮
+
+账号卡片的「领积分」按钮（→ `growth` → `PlatformRouter.growthOne`）对
+**Qoder 国内 / 国际版一律不渲染**。理由：`Platforms.supportsGrowth()` 对 Qoder 恒为 false，
+`growthOne` 只会返回 `skipped`「该平台没有成长中心；Qoder / Trae 的签到即领积分」——
+签到（`checkin` → 活动平台 campaigns + claim）本身已发放每日 100 Credits，
+再放一个永远「跳过」的按钮属于误导。WorkBuddy 国内版保留该按钮。
+首页「一键签到并领取积分」是批量动作，不受此约束。
+
+## 7.2 首页「6 个产品」矩阵
+
+`state` 响应新增 `scopes[]`，由 `Platforms.scopes()` 定义，固定 6 项
+（3 平台 × 2 档位，顺序 `wb_cn / wb_ai / qoder_cn / qoder_ai / trae_cn / trae_ai`）：
+
+```
+{ key, platform, variant, label, variantLabel, scopeLabel,
+  checkin, growth, accountCount }
+```
+
+- `accountCount` 由 `JsBridge.state()` 用 `Platforms.scopeKey(platform, variant)` 分组统计。
+- **汇总积分不落盘**：前端 `renderScopes()` 按同一 `scopeKey` 聚合 `S.credits[id].remaining`，
+  只累加 `ok === true` 且 `remaining` 为数值的结果。
+  无账号显示 `—`；有账号但没查到显示「**待查询**」；
+  部分账号查到时标注 `已查/总数`。**失败 / 未开放绝不算成 0**。
+- `reload()` 每次都静默执行一次 `creditsAll`，保证矩阵不是旧值。
+
+## 7.3 账号备注
+
+`JsBridge.call()` 新增 action：
+
+| action | args | 返回 |
+|:--|:--|:--|
+| `setRemark` | `{id, remark}` | `ok + message` / `ok:false + error` |
+
+→ `AccountStore.setRemark()`：按 `id` 定位，只改 `remark` 字段（trim、上限 60 字），
+**绝不触碰 token 等凭据**；`put()` 在瘦数据缺 `remark` 时从旧记录保留；
+`publicList()` / `importAll()` / `exportAll()` 均透传该字段。
+前端账号卡片显示备注并给出「加备注 / 改备注」弹窗，可一键清除。

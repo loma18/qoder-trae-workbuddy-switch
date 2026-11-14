@@ -23,7 +23,37 @@ public final class Platforms {
     public static final String QODER = "qoder";
     public static final String TRAE = "trae";
 
+    /** 首页「6 个产品」= 3 平台 × 2 档位，顺序固定，前端按此顺序渲染。 */
+    public static final String[] ALL_PLATFORMS = {WB, QODER, TRAE};
+    public static final String[] ALL_VARIANTS = {"cn", "ai"};
+
     private Platforms() { }
+
+    /** 产品唯一键：wb_cn / wb_ai / qoder_cn / qoder_ai / trae_cn / trae_ai。 */
+    public static String scopeKey(String platform, String variant) {
+        return normalize(platform) + "_" + ("ai".equals(variant) ? "ai" : "cn");
+    }
+
+    /** 6 个产品的静态定义（账号数由 JsBridge.state 填充）。 */
+    public static JSONArray scopes() {
+        JSONArray list = new JSONArray();
+        for (int i = 0; i < ALL_PLATFORMS.length; i++) {
+            for (int j = 0; j < ALL_VARIANTS.length; j++) {
+                String p = ALL_PLATFORMS[i], v = ALL_VARIANTS[j];
+                try {
+                    list.put(new JSONObject()
+                            .put("key", scopeKey(p, v))
+                            .put("platform", p).put("variant", v)
+                            .put("label", label(p))
+                            .put("variantLabel", variantLabel(v))
+                            .put("scopeLabel", scopeLabel(p, v))
+                            .put("checkin", supportsCheckin(p, v))
+                            .put("growth", supportsGrowth(p, v)));
+                } catch (Exception ignored) { }
+            }
+        }
+        return list;
+    }
 
     /** 归一化平台名；历史数据 / 空值一律按 WorkBuddy。 */
     public static String normalize(String raw) {
@@ -83,6 +113,7 @@ public final class Platforms {
                 for (int j = 0; j < vs.length; j++) {
                     JSONObject x = new JSONObject();
                     x.put("platform", ps[i]).put("variant", vs[j])
+                            .put("scopeKey", scopeKey(ps[i], vs[j]))
                             .put("label", label(ps[i]))
                             .put("variantLabel", variantLabel(vs[j]))
                             .put("qrLogin", supportsQrLogin(ps[i]))

@@ -93,6 +93,34 @@ body{overflow:hidden}
 .kv span{color:var(--dim);flex:0 0 auto}
 .kv b{font-weight:500;text-align:right;word-break:break-all;color:#c3d0ea}
 .acc-acts{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+/* 6 个产品矩阵 */
+.scope-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.scope-item{background:#111a2e;border:1px solid #202d49;border-radius:11px;padding:10px}
+.scope-top{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.scope-dot{width:8px;height:8px;border-radius:3px;flex:0 0 auto}
+.scope-name{font-size:12px;font-weight:650;color:var(--txt)}
+.scope-var{font-size:9px;padding:1px 5px;border-radius:4px;margin-left:auto;
+  background:rgba(91,140,255,.15);color:#9db9ff;white-space:nowrap}
+.scope-var.ai{background:rgba(176,108,255,.15);color:#d3a8ff}
+.scope-num{font-size:18px;font-weight:700;line-height:1.1}
+.scope-num small{font-size:10px;color:var(--dim);font-weight:400}
+.scope-cred{margin-top:5px;font-size:11px;color:var(--ok)}
+.scope-cred b{font-size:13px}
+.scope-cred small{color:var(--dim);font-size:9.5px}
+.scope-cred.dim,.scope-cred.dim b{color:var(--dim)}
+/* 账号备注 */
+.remark{margin-top:9px;padding:7px 9px;background:rgba(255,180,84,.08);
+  border:1px solid rgba(255,180,84,.22);border-radius:8px;font-size:11px;
+  color:#ffd39b;display:flex;gap:6px;align-items:flex-start;word-break:break-all}
+.remark .rk{flex:0 0 auto;opacity:.85}
+/* 积分明细：每月基础 Credits / 资源包 */
+.pack-list{margin-top:9px;border-top:1px solid #202d49;padding-top:8px}
+.pack-row{display:flex;align-items:center;gap:7px;font-size:10.5px;padding:3px 0}
+.pack-kind{flex:0 0 auto;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600}
+.pack-kind.base{background:rgba(56,211,159,.14);color:var(--ok)}
+.pack-kind.addon{background:rgba(91,140,255,.14);color:#9db9ff}
+.pack-name{flex:1;min-width:0;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pack-val{flex:0 0 auto;color:#c3d0ea;font-variant-numeric:tabular-nums}
 .empty{text-align:center;padding:38px 16px;color:var(--dim)}
 .empty .ic{font-size:34px;opacity:.5;margin-bottom:8px}
 .empty p{margin:0 0 14px;font-size:12.5px}
@@ -187,6 +215,15 @@ textarea{resize:vertical;line-height:1.5}
         <div class="stat"><b id="sCredits">—</b><span>剩余积分</span></div>
       </div>
       <div class="card">
+        <div class="sec-t">6 个产品 · 账号数与汇总积分 <span class="r" id="scopeSum"></span></div>
+        <div class="scope-grid" id="scopeGrid"></div>
+        <div class="hint" style="margin-top:10px">
+          WorkBuddy / Qoder / Trae × 国内版 / 国际版共 6 个产品。积分按各平台官方额度接口实时查询，
+          <b>「待查询」表示尚未成功取到该产品的余额</b>，不把失败或「未开放」算成 0；
+          单产品显示的是该产品下所有账号剩余积分之和。
+        </div>
+      </div>
+      <div class="card">
         <div class="sec-t">最近执行 <span class="r" id="lastAt"></span></div>
         <div id="homeResult"><div class="empty" style="padding:18px 8px">
           <div class="ic">◎</div><p>还没有执行记录，点上面按钮开始</p></div></div>
@@ -197,7 +234,9 @@ textarea{resize:vertical;line-height:1.5}
           1. 「账号」页点 <b>＋ 添加账号</b>，先选平台（WorkBuddy / Qoder / Trae），再选国内版或国际版。<br>
           2. <b>WorkBuddy / Qoder</b> 可手机独立扫码授权；<b>Trae</b> 上游绑定桌面客户端设备私钥与
              <code>127.0.0.1:17388</code> 回环，请粘贴 JWT 导入（一次导入，之后长期独立用）。<br>
-          3. 签到、领积分、查余额、刷新凭据全部由手机直连各平台官方接口完成。<br>
+          3. 签到、领积分、查余额、刷新凭据全部由手机直连各平台官方接口完成；
+             <b>Qoder</b> 的签到即在官方活动平台领 100 Credits，没有独立的「领积分」按钮。<br>
+          4. 账号名若是一串无意义字符，点账号卡片上的「加备注」写个好认的名字（只存本机）。<br>
           <span style="color:var(--warn)">同步到电脑是可选的</span>：只在「同步」页手动点才发生。
         </div>
       </div>
@@ -283,8 +322,8 @@ textarea{resize:vertical;line-height:1.5}
       </div>
       <div class="card">
         <div class="sec-t">关于</div>
-        <div class="kv"><span>版本</span><b id="verText">2.1.2</b></div>
-        <div class="kv"><span>运行形态</span><b>三平台独立客户端（本机账号库）</b></div>
+        <div class="kv"><span>版本</span><b id="verText">2.2.0</b></div>
+        <div class="kv"><span>运行形态</span><b>三平台 × 两档位独立客户端（本机账号库）</b></div>
         <div class="kv"><span>上游协议</span><b>fewards / workbuddy-console / switch core</b></div>
         <div class="kv"><span>凭据存储</span><b>App 私有 SharedPreferences</b></div>
         <div class="hint">账号信息默认只留在这台手机。同步到电脑是手动、可选的动作。</div>
@@ -376,8 +415,8 @@ var BROWSER = !HAS;
 var $ = function(s){ return document.querySelector(s); };
 var esc = function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
-var S = { cfg:{}, accounts:[], stats:{}, credits:{}, tab:'home', oauth:null, pollTimer:null,
-          addPlatform:'wb', addVariant:'cn', filterPlatform:'all', lastReport:null };
+var S = { cfg:{}, accounts:[], stats:{}, scopes:[], credits:{}, tab:'home', oauth:null, pollTimer:null,
+          addPlatform:'wb', addVariant:'cn', filterPlatform:'all', lastReport:null, remarkId:null };
 var PLATFORMS=[
   {id:'wb',label:'WorkBuddy',qr:true,growth:true,note:'手机独立扫码授权（fewards 协议）'},
   {id:'qoder',label:'Qoder',qr:true,growth:false,note:'PKCE 设备授权纯 HTTP 轮询；签到走官方活动平台领取 100 Credits（PAT 不可用，请扫码登录）'},
@@ -385,6 +424,19 @@ var PLATFORMS=[
 ];
 function platformMeta(p){ for(var i=0;i<PLATFORMS.length;i++) if(PLATFORMS[i].id===p) return PLATFORMS[i]; return PLATFORMS[0]; }
 function platformOf(a){ return (a && a.platform) || 'wb'; }
+/* ---------- 6 个产品（3 平台 × 2 档位） ---------- */
+var SCOPE_COLORS={wb_cn:'#5b8cff',wb_ai:'#8f7cff',qoder_cn:'#38d39f',
+  qoder_ai:'#2fb7c4',trae_cn:'#ffb454',trae_ai:'#ff8f6b'};
+function defaultScopes(){
+  var out=[], ps=[['wb','WorkBuddy'],['qoder','Qoder'],['trae','Trae']],
+      vs=[['cn','国内版'],['ai','国际版']];
+  ps.forEach(function(p){ vs.forEach(function(v){
+    out.push({key:p[0]+'_'+v[0],platform:p[0],variant:v[0],label:p[1],
+      variantLabel:v[1],scopeLabel:p[1]+' · '+v[1],accountCount:0});
+  });});
+  return out;
+}
+function scopeKeyOf(a){ return platformOf(a)+'_'+((a&&a.variant)==='ai'?'ai':'cn'); }
 var pending = {}, seq = 0;
 
 /* ---------- 原生桥 ---------- */
@@ -404,7 +456,7 @@ function bridge(action, args){
 function isNet(a){
   return ['state','loginStart','loginPoll','loginCancel','addManual','checkin','growth',
           'credits','creditsAll','refresh','syncPing','syncPush','syncFetch',
-          'export','importAccounts','removeAccount'].indexOf(a)>=0;
+          'export','importAccounts','removeAccount','setRemark'].indexOf(a)>=0;
 }
 function native(action, args){
   if(BROWSER) return Promise.resolve(demo(action,args||{}));
@@ -426,9 +478,9 @@ var DEMO = {
      tokenMask:'eyJ0eXAi…9ZkQ',hasRefresh:true,
      expiresAt:Math.floor(Date.now()/1000)+3600, refreshExpiresAt:Math.floor(Date.now()/1000)+2592000,
      obtainedAt:Date.now()-7200000,enterpriseId:'',avatarUrl:'',syncVersion:0},
-    {id:'qoder_cn_30003',label:'Qoder 演示账号',uid:'30003',variant:'cn',variantLabel:'国内版',
+    {id:'qoder_cn_30003',label:'usr_8f3c9d1e2a7b',uid:'30003',variant:'cn',variantLabel:'国内版',
      platform:'qoder',platformLabel:'Qoder',scopeLabel:'Qoder · 国内版',
-     tokenMask:'drt-abc…9Zx',hasRefresh:true,
+     tokenMask:'drt-abc…9Zx',hasRefresh:true,remark:'公司小号 · 每天签到',
      expiresAt:Math.floor(Date.now()/1000)+7200, refreshExpiresAt:0,
      obtainedAt:Date.now()-1800000,enterpriseId:'',avatarUrl:'',syncVersion:0},
     {id:'trae_cn_40004',label:'Trae 演示账号',uid:'40004',variant:'cn',variantLabel:'国内版',
@@ -447,12 +499,16 @@ var DEMO = {
   demo:true, autoCheckin:false, intervalMin:360, notify:true
 };
 function demoAccounts(){ return DEMO.accounts.map(function(a){
-  var o={}; for(var k in a) o[k]=a[k]; return o; }); }
+  var o={}; for(var k in a) o[k]=a[k];
+  if(o.remark===undefined) o.remark=''; return o; }); }
 function demo(action,a){
   var P=function(o){ return o; };
-  if(action==='state') return {ok:true,version:'2.1.2',sdk:34,demo:DEMO.demo,
+  if(action==='state') return {ok:true,version:'2.2.0',sdk:34,demo:DEMO.demo,
     autoCheckin:DEMO.autoCheckin,intervalMin:DEMO.intervalMin,notify:DEMO.notify,
     sync:DEMO.sync,accounts:demoAccounts(),
+    scopes:defaultScopes().map(function(s){
+      s.accountCount=DEMO.accounts.filter(function(x){return scopeKeyOf(x)===s.key}).length;
+      return s;}),
     stats:{total:DEMO.accounts.length,
       cn:DEMO.accounts.filter(function(x){return x.variant==='cn'}).length,
       ai:DEMO.accounts.filter(function(x){return x.variant==='ai'}).length,
@@ -503,6 +559,12 @@ function demo(action,a){
     if(action==='removeAccount') DEMO.accounts=DEMO.accounts.filter(function(x){return x.id!==a.id});
     return {ok:true,message:'已处理（演示）'};
   }
+  if(action==='setRemark'){
+    var rfound=false;
+    DEMO.accounts.forEach(function(x){
+      if(x.id===a.id){ x.remark=String(a.remark||'').trim(); rfound=true; }});
+    return rfound?{ok:true,message:'备注已保存（演示）'}:{ok:false,error:'账号不存在（演示）'};
+  }
   if(action==='addManual'||action==='importAccounts'){
     var v2=a.variant||'cn', pf2=(a&&a.platform)||'wb', uid2='m'+Date.now();
     var m2=platformMeta(pf2);
@@ -543,10 +605,13 @@ function demo(action,a){
   }
   if(action==='credits'||action==='creditsAll'){
     var cr={ok:true,total:2000,remaining:1360,used:640,unit:'credits',
-      packages:[{name:'月度赠送包',code:'FREE_MONTHLY',total:1000,remaining:360,used:640,
-                 expireAt:Date.now()+12*86400000},
-                {name:'体验包',code:'TRIAL',total:1000,remaining:1000,used:0,expireAt:0}],
-      expireAt:Date.now()+12*86400000,variant:'cn'};
+      baseTotal:1000,baseRemaining:360,addonTotal:1000,addonRemaining:1000,
+      packages:[
+        {name:'每月赠送基础 Credits',code:'FREE_MONTHLY',kind:'base',
+         total:1000,remaining:360,used:640,expireAt:Date.now()+12*86400000},
+        {name:'资源包 · 体验包',code:'TRIAL',kind:'addon',
+         total:1000,remaining:1000,used:0,expireAt:0}],
+      expireAt:Date.now()+12*86400000,source:'demo',variant:'cn'};
     var blocked={ok:false,disabled:true,
       message:'Trae 国际版账号网关未开放 /trae/api/v2 积分路由，请到电脑端 Trae 客户端确认该账号权益',
       detail:'Trae 国际版账号网关（grow-normal.trae.ai）未开放 /trae/api/v2 签到 / 积分路由，已如实标记「未开放」'};
@@ -638,7 +703,7 @@ function render(){
   $('#sCredits').textContent=sum==null?'—':Math.round(sum);
   $('#hdBadge').className='badge'+(S.cfg.demo?' demo':'');
   $('#hdBadge').textContent=S.cfg.demo?'演示模式':'本机独立运行';
-  $('#verText').textContent='2.1.2'+(BROWSER?' · 浏览器预览':'');
+  $('#verText').textContent='2.2.0'+(BROWSER?' · 浏览器预览':'');
   $('#swAuto').checked=!!S.cfg.autoCheckin;
   $('#swNotify').checked=!!S.cfg.notify;
   $('#swDemo').checked=!!S.cfg.demo;
@@ -646,7 +711,40 @@ function render(){
   $('#syncHost').value=(S.cfg.sync&&S.cfg.sync.host)||'';
   $('#syncPort').value=(S.cfg.sync&&S.cfg.sync.port)||57900;
   $('#syncCode').value=(S.cfg.sync&&S.cfg.sync.code)||'';
-  renderAccounts(); renderHomeResult();
+  renderAccounts(); renderHomeResult(); renderScopes();
+}
+/* 6 个产品矩阵：账号数由原生 state 给出，汇总积分按同一 scopeKey 聚合 S.credits。
+   只累加 ok 且 remaining 为数值的结果；无账号显示「—」，有账号但没查到显示「待查询」。 */
+function renderScopes(){
+  var grid=$('#scopeGrid'); if(!grid) return;
+  var accounts=S.accounts||[];
+  var scopes=(S.scopes&&S.scopes.length)?S.scopes:defaultScopes();
+  grid.innerHTML=scopes.map(function(s){
+    var n=0, rem=0, known=0;
+    accounts.forEach(function(a){
+      if(scopeKeyOf(a)!==s.key) return;
+      n++;
+      var c=S.credits[a.id];
+      if(c&&c.ok&&typeof c.remaining==='number'){ rem+=c.remaining; known++; }
+    });
+    if(s.accountCount!==undefined && accounts.length) n=s.accountCount;
+    var hasAny=known>0;
+    var credTxt=(n===0)?'—':(hasAny?Math.round(rem).toLocaleString():'待查询');
+    var color=SCOPE_COLORS[s.key]||'#5b8cff';
+    return '<div class="scope-item">'+
+      '<div class="scope-top"><span class="scope-dot" style="background:'+color+'"></span>'+
+        '<span class="scope-name">'+esc(s.label)+'</span>'+
+        '<span class="scope-var'+(s.variant==='ai'?' ai':'')+'">'+esc(s.variantLabel)+'</span></div>'+
+      '<div class="scope-num">'+n+' <small>个账号</small></div>'+
+      '<div class="scope-cred'+(hasAny?'':' dim')+'"><b>'+esc(credTxt)+'</b> '+
+        '<small>剩余积分'+(hasAny&&n>known?' · '+known+'/'+n+' 已查':'')+'</small></div>'+
+    '</div>';
+  }).join('');
+  var sum=null, cnt=0;
+  Object.keys(S.credits).forEach(function(k){
+    var c=S.credits[k]; if(c&&c.ok&&typeof c.remaining==='number'){ sum=(sum||0)+c.remaining; cnt++; }
+  });
+  $('#scopeSum').textContent=(sum==null?'':('已取到 '+cnt+' 个账号 · 合计 '+Math.round(sum)+' credits'));
 }
 function renderAccounts(){
   var f=S.filterPlatform||'all';
@@ -671,18 +769,39 @@ function renderAccounts(){
   });
   $('#accList').innerHTML=html;
 }
+function packListHtml(c){
+  var ps=c.packages||[];
+  if(!ps.length) return '';
+  return '<div class="pack-list">'+ps.slice(0,8).map(function(p){
+    var base=p.kind==='base';
+    return '<div class="pack-row"><span class="pack-kind '+(base?'base':'addon')+'">'+
+      (base?'基础':'资源包')+'</span>'+
+      '<span class="pack-name">'+esc(p.name||'资源包')+'</span>'+
+      '<span class="pack-val">'+Math.round(p.remaining||0)+' / '+Math.round(p.total||0)+'</span></div>';
+  }).join('')+(ps.length>8?'<div class="tiny" style="margin-top:4px">还有 '+(ps.length-8)+' 项…</div>':'')+'</div>';
+}
 function accCard(a){
-  var h=credHealth(a), c=S.credits[a.id];
+  var h=credHealth(a), c=S.credits[a.id], pf=platformOf(a);
   var credHtml='';
   if(c&&c.ok){
     var pct=c.total>0?Math.max(0,Math.min(100,c.remaining/c.total*100)):0;
+    var hasSplit=(typeof c.baseRemaining==='number'||typeof c.addonRemaining==='number');
     credHtml='<div class="cred-box"><div class="cred-n"><b>'+Math.round(c.remaining)+
       '</b><span>/ '+Math.round(c.total)+' '+(c.unit||'credits')+' 剩余</span></div>'+
       '<div class="bar"><i style="width:'+pct.toFixed(1)+'%"></i></div>'+
-      (c.expireAt?'<div class="kv" style="margin-top:7px"><span>最近到期</span><b>'+fmtTime(Math.floor(c.expireAt/1000))+'</b></div>':'')+
+      (hasSplit
+        ? '<div class="kv" style="margin-top:8px"><span>每月赠送基础 Credits</span><b>'+Math.round(c.baseRemaining||0)+'</b></div>'+
+          '<div class="kv"><span>资源包 / 加购</span><b>'+Math.round(c.addonRemaining||0)+'</b></div>'
+        : '')+
+      (c.nextResetAt?'<div class="kv"><span>下次月度重置</span><b>'+fmtTime(Math.floor(c.nextResetAt/1000))+'</b></div>':'')+
+      (c.expireAt?'<div class="kv"><span>最近到期</span><b>'+fmtTime(Math.floor(c.expireAt/1000))+'</b></div>':'')+
+      (c.planName?'<div class="kv"><span>套餐</span><b>'+esc(c.planName)+'</b></div>':'')+
+      packListHtml(c)+
+      (c.baseHint?'<div class="hint" style="margin-top:7px">'+esc(c.baseHint)+'</div>':'')+
       '</div>';
-  } else if(c&&c.error){
-    credHtml='<div class="cred-box"><span class="tag-err tiny">积分查询失败：'+esc(c.error)+'</span></div>';
+  } else if(c&&(c.error||c.message)){
+    credHtml='<div class="cred-box"><span class="'+(c.disabled?'tag-warn':'tag-err')+' tiny">'+
+      esc(c.message||c.error||'积分暂不可用')+'</span></div>';
   }
   return '<div class="acc">'+
     '<div class="acc-h"><div class="av" style="background:'+avatarColor(a.id)+'">'+
@@ -691,6 +810,7 @@ function accCard(a){
         '<span style="display:inline-block;margin-right:5px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(99,102,241,.18);color:#a5b4fc;vertical-align:middle">'+esc(a.platformLabel||'WorkBuddy')+'</span>'+
         '<span class="vtag '+(a.variant==='ai'?'ai':'')+'">'+esc(a.variantLabel||'国内版')+'</span></div>'+
       '<div class="acc-m">uid '+esc(a.uid||'（无）')+' · '+esc(a.tokenMask||'')+'</div></div></div>'+
+    (a.remark?'<div class="remark"><span class="rk">✎ 备注</span><span>'+esc(a.remark)+'</span></div>':'')+
     '<div style="margin-top:10px">'+
       '<div class="kv"><span>access 到期</span><b>'+fmtExp(a.expiresAt)+'</b></div>'+
       '<div class="kv"><span>refresh 到期</span><b>'+fmtExp(a.refreshExpiresAt)+'</b></div>'+
@@ -699,8 +819,9 @@ function accCard(a){
     '<div class="acc-acts">'+
       '<button class="btn sm" onclick="App.credits(\''+esc(a.id)+'\')">查积分</button>'+
       '<button class="btn sm" onclick="App.checkinOne(\''+esc(a.id)+'\')">签到</button>'+
-      '<button class="btn sm" onclick="App.growthOne(\''+esc(a.id)+'\')">领积分</button>'+
+      (pf==='qoder'?'':'<button class="btn sm" onclick="App.growthOne(\''+esc(a.id)+'\')">领积分</button>')+
       '<button class="btn sm" onclick="App.refresh(\''+esc(a.id)+'\')">刷新凭据</button>'+
+      '<button class="btn sm" onclick="App.editRemark(\''+esc(a.id)+'\')">'+(a.remark?'改备注':'加备注')+'</button>'+
       '<button class="btn sm dan" onclick="App.remove(\''+esc(a.id)+'\')">删除</button>'+
     '</div></div>';
 }
@@ -741,11 +862,14 @@ function reload(){
   return native('state').then(function(st){
     if(!st||st.ok===false){ toast((st&&st.error)||'读取状态失败',true); return; }
     S.cfg=st; S.accounts=st.accounts||[]; S.stats=st.stats||{};
+    S.scopes=(st.scopes&&st.scopes.length)?st.scopes:defaultScopes();
     render();
     if(st.lastCheckin){ try{ var r=JSON.parse(st.lastCheckin);
       S.lastReport={at:r.at,items:(r.items||[]).map(function(i){
         return {id:i.id,label:i.label,result:i.result};})}; renderHomeResult(); }catch(e){} }
-    if(S.accounts.length && !Object.keys(S.credits).length) refreshCredits(true);
+    // 首页矩阵要显示各产品汇总积分：每次 reload 都静默刷新一次余额，
+    // 否则新加账号 / 手动查完积分后矩阵会停留在旧值。
+    if(S.accounts.length) refreshCredits(true);
   });
 }
 function refreshCredits(silent){
@@ -799,6 +923,16 @@ function sheet(kind){
       '<label class="fld"><textarea id="exportBox" rows="9"></textarea></label>'+
       '<div class="btn-row" style="margin-top:10px"><button class="btn sm" onclick="App.copyText(\'exportBox\')">复制</button>'+
       '<button class="btn sm" onclick="App.closeSheet()">关闭</button></div>';
+  } else if(kind==='remark'){
+    var ra=(S.accounts||[]).filter(function(x){return x.id===S.remarkId;})[0]||{};
+    h+='<h2>账号备注</h2><p class="desc">只保存在这台手机，用来辨认一串无意义字符的账号名；不会改动凭据，同步到电脑时也不覆盖 token。</p>'+
+      '<label class="fld"><span>账号</span><input value="'+esc(ra.label||S.remarkId)+'" readonly style="color:var(--sub)"></label>'+
+      '<label class="fld"><span>备注（最多 60 字）</span>'+
+      '<input id="remarkInput" maxlength="60" value="'+esc(ra.remark||'')+'" placeholder="例如：公司小号 / 备用邮箱 / 团队共用"></label>'+
+      '<div class="btn-row" style="margin-top:12px">'+
+        '<button class="btn pri" onclick="App.saveRemark()">保存备注</button>'+
+        (ra.remark?'<button class="btn dan" onclick="App.saveRemark(true)">清除</button>':'')+
+        '<button class="btn" onclick="App.closeSheet()">取消</button></div>';
   } else if(kind==='report'){
     h+='<h2>执行结果</h2><div id="reportBox"></div>'+
       '<button class="btn full" style="margin-top:12px" onclick="App.closeSheet()">关闭</button>';
@@ -936,6 +1070,17 @@ var App={
     if(!confirm('确定删除这个本机账号？')) return;
     native('removeAccount',{id:id}).then(function(r){
       toast(r&&r.ok?'已删除':'删除失败',!r||!r.ok); reload();
+    });
+  },
+  editRemark:function(id){ S.remarkId=id; sheet('remark'); },
+  saveRemark:function(clear){
+    var id=S.remarkId, el=document.getElementById('remarkInput');
+    if(!id){ toast('缺少账号 id',true); return; }
+    var v=clear?'':((el&&el.value)||'').trim();
+    native('setRemark',{id:id,remark:v}).then(function(r){
+      if(!r||!r.ok){ toast((r&&r.error)||'备注保存失败',true); return; }
+      (S.accounts||[]).forEach(function(a){ if(a.id===id) a.remark=v; });
+      toast(clear?'备注已清除':'备注已保存'); closeSheet(); render();
     });
   },
   runAll:function(){

@@ -98,6 +98,12 @@ public final class JsBridge {
             AccountStore.remove(ctx, a.optString("id", ""));
             return ok("账号已删除");
         }
+        if ("setRemark".equals(action)) {
+            String rid = a.optString("id", "");
+            if (rid.isEmpty()) return err("缺少账号 id");
+            boolean done = AccountStore.setRemark(ctx, rid, a.optString("remark", ""));
+            return done ? ok("备注已保存") : err("账号不存在，备注未保存");
+        }
         if ("checkin".equals(action)) return forEach(a.optJSONArray("ids"), "checkin");
         if ("growth".equals(action)) return forEach(a.optJSONArray("ids"), "growth");
         if ("credits".equals(action)) {
@@ -211,6 +217,22 @@ public final class JsBridge {
                 else if (Platforms.TRAE.equals(pf)) nTrae++;
                 else nWb++;
             }
+            // 首页「6 个产品」矩阵：按 平台 × 档位 分组统计账号数；
+            // 汇总积分由前端拿 S.credits 按同样的 scopeKey 聚合（积分不落盘，避免读到过期值）。
+            JSONArray scopes = Platforms.scopes();
+            for (int s = 0; s < scopes.length(); s++) {
+                JSONObject sc = scopes.optJSONObject(s);
+                if (sc == null) continue;
+                String key = sc.optString("key", "");
+                int n = 0;
+                for (int i = 0; i < accounts.length(); i++) {
+                    JSONObject x = accounts.optJSONObject(i);
+                    if (x == null) continue;
+                    if (key.equals(Platforms.scopeKey(Platforms.of(x),
+                            x.optString("variant", "cn")))) n++;
+                }
+                sc.put("accountCount", n);
+            }
             JSONObject sync = new JSONObject();
             sync.put("host", Prefs.syncHost(ctx)).put("port", Prefs.syncPort(ctx))
                     .put("code", Prefs.syncCode(ctx));
@@ -227,6 +249,7 @@ public final class JsBridge {
                     .put("notify", Prefs.notifyEnabled(ctx))
                     .put("sync", sync)
                     .put("accounts", accounts)
+                    .put("scopes", scopes)
                     .put("stats", new JSONObject().put("total", accounts.length())
                             .put("cn", cn).put("ai", ai)
                             .put("wb", nWb).put("qoder", nQoder).put("trae", nTrae))

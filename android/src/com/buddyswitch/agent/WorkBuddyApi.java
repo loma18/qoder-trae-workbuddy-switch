@@ -43,6 +43,13 @@ public final class WorkBuddyApi {
     private static final String P_FREE = "/billing/meter/get-user-resource-free-packages";
     private static final String GROWTH_BASE = "https://www.codebuddy.cn/v2/activity/growth";
 
+    /** 官方「每月赠送基础 Credits」免费包商品码（对齐 core credits.rs::FREE_PACKAGE_CODES）。 */
+    private static final String[] FREE_PACKAGE_CODES = {
+            "TCACA_code_008_cfWoLwvjU4", "TCACA_code_007_nzdH5h4Nl0",
+            "TCACA_code_028_NtpWi0jzXs", "TCACA_code_029_6wCGEWquYy",
+            "TCACA_code_030_BjSt89qTvr"
+    };
+
     private static final long STATE_TTL_MS = 300_000L;   // 二维码 5 分钟
     private static final int CODE_WAITING = 11217;       // 未扫码
     private static final int CODE_ALREADY = 10001;       // 今日已签
@@ -595,12 +602,97 @@ public final class WorkBuddyApi {
             out.put("ok", true).put("total", total).put("remaining", remaining)
                     .put("used", used).put("unit", unit).put("packages", details)
                     .put("expireAt", earliestExpiry).put("variant", v.id);
+            enrichFreePackages(out, origin, h, details);
             if (out.has("warn")) { /* 保留 */ }
         } catch (Exception e) {
             try { out.put("ok", false).put("error", "解析失败：" + e.getMessage()); }
             catch (Exception ignored) { }
         }
         return out;
+    }
+
+    /**
+     * 补齐「每月赠送的基础 Credits」：官方把免费月度包单独放在
+     * {@code /billing/meter/get-user-resource-free-packages}，与汇总接口的资源包是两路数据。
+     *
+     * <p>纪律：这里只做「分类展示」，<b>不改汇总接口给出的权威 total/remaining</b> ——
+     * 免费包接口与 summary 的口径可能重叠，贸然相加会重复计数、把余额算大。
+     * 接口失败 / 返回空时退化为按包名识别，并在 baseHint 如实说明，绝不假装查到了。
+     */
+    private static void enrichFreePackages(JSONObject out, String origin,
+                                           Map<String, String> h, JSONArray summaryDetails) {
+        double baseTotal = 0, baseRem = 0, addonTotal = 0, addonRem = 0;
+        JSONArray freeRows = null;
+        try {
+            String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    .format(new java.util.Date());
+            StringBuilder codes = new StringBuilder();
+            for (int i = 0; i < FREE_PACKAGE_CODES.length; i++) {
+                if (i > 0) codes.append(',');
+                codes.append('"').append(FREE_PACKAGE_CODES[i]).append('"');
+            }
+            String body = "{\"PageNumber\":1,\"PageSize\":200,\"Status\":[0,3],"
+                    + "\"SlicePeriodStartTime\":\"" + day + " 00:00:00\","
+                    + "\"SlicePeriodEndTime\":\"" + day + " 23:59:59\","
+                    + "\"PackageCodes\":[" + codes + "]}";
+            Http.Resp fr = call("POST", origin + P_FREE, h, body);
+            if (fr != null && fr.error == null && fr.ok()) {
+                JSONObject j = obj(fr.body);
+                int code = j.optInt("code", j.optInt("Code", 0));
+                if (code == 0) {
+                    freeRows = digArr(j, "Accounts");
+                    if (freeRows == null) freeRows = digArr(j, "accounts");
+                }
+            }
+        } catch (Exception ignored) { }
+
+        try {
+            java.util.HashSet<String> freeCodes = new java.util.HashSet<String>();
+            JSONArray merged = new JSONArray();
+            if (freeRows != null) {
+                for (int i = 0; i < freeRows.length(); i++) {
+                    JSONObject p = freeRows.optJSONObject(i);
+                    if (p == null) continue;
+                    double t = num(firstVal(p, "CycleTotalCapacity", "CycleCapacitySize", "totalCapacity"));
+                    double rem = num(firstVal(p, "CycleRemainCapacity", "CycleCapacityRemain", "remainCapacity"));
+                    double u = num(firstVal(p, "CycleUsedCapacity", "CycleCapacityUsed", "usedCapacity"));
+                    String code = firstStr(p, "PackageCode", "packageCode");
+                    if (!code.isEmpty()) freeCodes.add(code);
+                    String name = firstStr(p, "PackageName", "packageName", "name");
+                    if (name.isEmpty()) name = "每月赠送基础 Credits";
+                    JSONObject d = new JSONObject();
+                    d.put("name", name).put("code", code).put("kind", "base")
+                            .put("total", t).put("remaining", rem).put("used", u)
+                            .put("expireAt", parseEnd(p));
+                    merged.put(d);
+                    baseTotal += t; baseRem += rem;
+                }
+            }
+            for (int i = 0; i < summaryDetails.length(); i++) {
+                JSONObject d = summaryDetails.optJSONObject(i);
+                if (d == null) continue;
+                String code = d.optString("code", "");
+                if (!code.isEmpty() && freeCodes.contains(code)) continue;  // 免费包已列过，不重复
+                String name = d.optString("name", "");
+                boolean free = name.contains("免费") || name.contains("赠送")
+                        || name.contains("月度") || name.contains("基础")
+                        || code.toLowerCase().contains("free");
+                d.put("kind", free ? "base" : "addon");
+                merged.put(d);
+                if (free) {
+                    baseTotal += d.optDouble("total", 0); baseRem += d.optDouble("remaining", 0);
+                } else {
+                    addonTotal += d.optDouble("total", 0); addonRem += d.optDouble("remaining", 0);
+                }
+            }
+            out.put("packages", merged)
+                    .put("baseTotal", baseTotal).put("baseRemaining", baseRem)
+                    .put("addonTotal", addonTotal).put("addonRemaining", addonRem)
+                    .put("source", freeRows != null ? "summary+free" : "summary");
+            if (freeRows == null) {
+                out.put("baseHint", "每月赠送基础 Credits 的独立接口未返回明细，已按资源包名称识别分类");
+            }
+        } catch (Exception ignored) { }
     }
 
     private static long parseEnd(JSONObject p) {

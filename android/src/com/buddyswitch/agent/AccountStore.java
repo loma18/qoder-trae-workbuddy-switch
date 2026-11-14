@@ -62,6 +62,7 @@ public final class AccountStore {
             o.put("avatarUrl", "");
             o.put("uid", uid == null ? "" : uid);
             o.put("enterpriseId", "");
+            o.put("remark", "");            // 用户自定义备注（账号名是无意义字符时用它辨认）
             o.put("refreshToken", "");
             o.put("expiresAt", 0L);
             o.put("obtainedAt", System.currentTimeMillis());
@@ -104,6 +105,12 @@ public final class AccountStore {
             if (old != null) {
                 copyIfEmpty(acc, old, "avatarUrl");
                 copyIfEmpty(acc, old, "enterpriseId");
+                // 备注是本机私有字段：电脑端回传 / 刷新 / 重新扫码的瘦数据里没有时，
+                // 必须原样保留，不能被空串覆盖掉。
+                if (!acc.has("remark") || acc.optString("remark", "").isEmpty()) {
+                    try { acc.put("remark", old.optString("remark", "")); }
+                    catch (Exception ignored) { }
+                }
             }
             try { arr.put(hit, acc); } catch (Exception ignored) { }
         } else {
@@ -134,6 +141,28 @@ public final class AccountStore {
             if (e != null && !id.equals(e.optString("id", ""))) out.put(e);
         }
         save(c, out);
+    }
+
+    /**
+     * 设置 / 清除本机账号备注。备注只改这一个字段，绝不动凭据；
+     * 长度上限 60 字符，避免把 SharedPreferences 撑大或把 UI 撑破。
+     */
+    public static boolean setRemark(Context c, String id, String remark) {
+        if (id == null || id.isEmpty()) return false;
+        String value = remark == null ? "" : remark.trim();
+        if (value.length() > 60) value = value.substring(0, 60);
+        JSONArray arr = load(c);
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject e = arr.optJSONObject(i);
+            if (e == null || !id.equals(e.optString("id", ""))) continue;
+            try {
+                e.put("remark", value);
+                arr.put(i, e);
+                save(c, arr);
+                return true;
+            } catch (Exception ignored) { return false; }
+        }
+        return false;
     }
 
     /** 局部更新凭据（刷新 / 同步回写）。空值不覆盖，避免把有效 token 清空。 */
@@ -172,8 +201,9 @@ public final class AccountStore {
             try {
                 String[] keys = {"id", "label", "avatarUrl", "uid", "enterpriseId",
                         "expiresAt", "obtainedAt", "refreshExpiresAt", "syncVersion",
-                        "variant", "platform"};
+                        "variant", "platform", "remark"};
                 for (String k : keys) p.put(k, e.opt(k));
+                if (!p.has("remark")) p.put("remark", "");
                 p.put("tokenMask", mask(e.optString("token", "")));
                 p.put("hasRefresh", !e.optString("refreshToken", "").isEmpty());
                 p.put("variant", WbVariant.normalize(e.optString("variant", "cn")));
@@ -220,6 +250,7 @@ public final class AccountStore {
                 a.put("refreshToken", src.optString("refreshToken", ""));
                 a.put("enterpriseId", src.optString("enterpriseId", ""));
                 a.put("avatarUrl", src.optString("avatarUrl", ""));
+                a.put("remark", src.optString("remark", ""));
                 a.put("expiresAt", src.optLong("expiresAt", 0L));
                 a.put("refreshExpiresAt", src.optLong("refreshExpiresAt", 0L));
             } catch (Exception ignored) { }

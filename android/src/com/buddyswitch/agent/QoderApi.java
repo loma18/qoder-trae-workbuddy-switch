@@ -563,31 +563,144 @@ public final class QoderApi {
         }
     }
 
-    /** 额度查询：GET /api/v2/quota/usage，聚合 userQuota + addOnQuota。 */
+    // 网页端逐包额度（PLAN 每月基础 + BONUS 资源包）。上游 core 的 web_usage.rs
+    // 只认浏览器会话 Cookie，手机只有 Bearer —— 这里「尽力试一次」，通了就用它的
+    // 分组明细，不通静默回落 quota/usage，绝不因为附加请求失败就把主结果写成 0。
+    private static final String P_WEB_USAGE = "/api/v2/me/usages/big_model_credits";
+
+    /**
+     * 额度查询：主通道 GET /api/v2/quota/usage，把
+     * <b>userQuota（每月赠送的基础 Credits）</b> 与 <b>addOnQuota（资源包）</b>
+     * 拆成两条明细，而不是只给一个笼统合计；再尽力补充网页端 PLAN 分组与下月重置时间。
+     *
+     * <p>返回字段在原有 total/used/remaining/unit 之外新增：
+     * packages[{name,code,kind,total,used,remaining,expireAt}]、baseTotal/baseRemaining、
+     * addonTotal/addonRemaining、source、可选 nextResetAt / planName。
+     */
     public static JSONObject creditsOne(Context ctx, JSONObject acc) {
         String v = variantOf(acc);
         String uid = acc.optString("uid", "");
         String token = acc.optString("token", "");
         if (token.isEmpty()) return fail("凭据为空，请重新导入");
-        Http.Resp r = Http.request("GET", openapi(v) + P_QUOTA,
-                openapiHeaders(v, uid, token), null, 12000, 30000);
+        Map<String, String> h = openapiHeaders(v, uid, token);
+        Http.Resp r = Http.request("GET", openapi(v) + P_QUOTA, h, null, 12000, 30000);
         if (r.error != null) return fail("网络不可达：" + r.error);
         if (!r.ok()) return fail("额度查询失败：HTTP " + r.status + " " + brief(r.body));
         JSONObject j = obj(r.body);
         JSONObject uq = j.optJSONObject("userQuota");
         JSONObject aq = j.optJSONObject("addOnQuota");
         if (uq == null && aq == null) return fail("额度响应缺少 userQuota / addOnQuota");
-        double remaining = num(uq, "remaining") + num(aq, "remaining");
-        double used = num(uq, "used") + num(aq, "used");
-        double total = num(uq, "total") + num(aq, "total");
+
+        double baseTotal = num(uq, "total"), baseUsed = num(uq, "used"), baseRem = num(uq, "remaining");
+        double addTotal = num(aq, "total"), addUsed = num(aq, "used"), addRem = num(aq, "remaining");
+
+        JSONArray packages = new JSONArray();
+        try {
+            packages.put(creditPack("每月赠送基础 Credits", "PLAN_BASE", "base",
+                    baseTotal, baseUsed, baseRem, 0L));
+            packages.put(creditPack("资源包 / 加购 Credits", "ADD_ON", "addon",
+                    addTotal, addUsed, addRem, 0L));
+        } catch (Exception ignored) { }
 
         JSONObject out = new JSONObject();
         try {
-            out.put("ok", true).put("remaining", remaining).put("used", used)
-                    .put("total", total).put("unit", "credits")
+            out.put("ok", true)
+                    .put("total", baseTotal + addTotal).put("used", baseUsed + addUsed)
+                    .put("remaining", baseRem + addRem)
+                    .put("baseTotal", baseTotal).put("baseRemaining", baseRem)
+                    .put("addonTotal", addTotal).put("addonRemaining", addRem)
+                    .put("unit", "credits").put("packages", packages)
+                    .put("source", "quota/usage")
                     .put("platform", Platforms.QODER).put("variant", v);
         } catch (Exception ignored) { }
+
+        mergeWebUsage(out, v, h);
         return out;
+    }
+
+    private static JSONObject creditPack(String name, String code, String kind,
+                                         double total, double used, double rem, long expireAt) {
+        JSONObject p = new JSONObject();
+        try {
+            p.put("name", name).put("code", code).put("kind", kind)
+                    .put("total", total).put("used", used).put("remaining", rem)
+                    .put("expireAt", expireAt);
+        } catch (Exception ignored) { }
+        return p;
+    }
+
+    /** 只认「能解析出分组的 JSON」；401/403 / SPA HTML fallback 一律静默忽略。 */
+    private static void mergeWebUsage(JSONObject out, String v, Map<String, String> h) {
+        try {
+            Map<String, String> wh = new HashMap<String, String>(h);
+            wh.put("Referer", website(v) + "/account/usage");
+            wh.put("Accept", "application/json, text/plain, */*");
+            Http.Resp w = Http.request("GET", website(v) + P_WEB_USAGE, wh, null, 8000, 10000);
+            if (!w.ok()) return;
+            JSONObject j = obj(w.body);
+            if (!j.has("plan_quota") && !j.has("total_quota")
+                    && !j.has("resource_package_quota")) return;
+
+            JSONObject plan = j.optJSONObject("plan_quota");
+            JSONObject res = j.optJSONObject("resource_package_quota");
+            JSONObject ded = j.optJSONObject("dedicated_resource_package_quota");
+            JSONObject ps = plan == null ? null : plan.optJSONObject("quota_summary");
+            JSONObject rs = res == null ? null : res.optJSONObject("quota_summary");
+            JSONObject ds = ded == null ? null : ded.optJSONObject("quota_summary");
+            if (ps == null && rs == null) return;
+
+            double bt = webNum(ps, "limit_value"), bu = webNum(ps, "used_value"), br = webNum(ps, "remaining_value");
+            double at = webNum(rs, "limit_value") + webNum(ds, "limit_value");
+            double au = webNum(rs, "used_value") + webNum(ds, "used_value");
+            double ar = webNum(rs, "remaining_value") + webNum(ds, "remaining_value");
+
+            JSONArray packs = new JSONArray();
+            appendWebDetail(packs, plan, "base");
+            appendWebDetail(packs, res, "addon");
+            appendWebDetail(packs, ded, "addon");
+            if (packs.length() == 0) {
+                packs.put(creditPack("每月赠送基础 Credits（套餐）", "PLAN_BASE", "base", bt, bu, br, 0L));
+                packs.put(creditPack("资源包 / 加购 Credits", "ADD_ON", "addon", at, au, ar, 0L));
+            }
+
+            out.put("total", bt + at).put("used", bu + au).put("remaining", br + ar)
+                    .put("baseTotal", bt).put("baseRemaining", br)
+                    .put("addonTotal", at).put("addonRemaining", ar)
+                    .put("packages", packs).put("source", "web-usage");
+            long next = j.optLong("nextResetAt", 0L);
+            if (next > 0) out.put("nextResetAt", next);
+            long last = j.optLong("lastResetAt", 0L);
+            if (last > 0) out.put("lastResetAt", last);
+            String planName = j.optString("planName", j.optString("plan_name", ""));
+            if (!planName.isEmpty()) out.put("planName", planName);
+        } catch (Exception ignored) { }
+    }
+
+    private static double webNum(JSONObject o, String key) {
+        if (o == null) return 0;
+        try { return Double.parseDouble(String.valueOf(o.opt(key))); }
+        catch (Exception e) { return 0; }
+    }
+
+    /** 逐包明细：PLAN 归「每月基础」，BONUS 归「资源包」；过期包不展示。 */
+    private static void appendWebDetail(JSONArray packs, JSONObject group, String kind) {
+        if (group == null) return;
+        JSONArray rows = group.optJSONArray("quota_detail");
+        if (rows == null) return;
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) continue;
+            if ("EXPIRED".equalsIgnoreCase(row.optString("status", ""))) continue;
+            double t = webNum(row, "limit_value");
+            double u = webNum(row, "used_value");
+            double rem = webNum(row, "remaining_value");
+            long exp = row.optLong("expires_at", 0L);
+            if (exp > 0 && exp < 100000000000L) exp *= 1000L;  // 真样本里秒 / 毫秒混用
+            String source = row.optString("source", "");
+            String name = "PLAN".equalsIgnoreCase(source) ? "套餐每月基础" : "赠送 / 加购资源包";
+            try { packs.put(creditPack(name, source, kind, t, u, rem, exp)); }
+            catch (Exception ignored) { }
+        }
     }
 
     public static JSONObject refreshOne(JSONObject acc) {

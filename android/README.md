@@ -1,8 +1,8 @@
-# Buddy Switch Agent（Android · 三平台独立版 v2.1）
+# Buddy Switch Agent（Android · 三平台独立版 v2.2）
 
 **手机独立完成 WorkBuddy / Qoder / Trae 的登录、签到、领积分、查余额；账号信息同步到电脑是可选的。**
 
-产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 7 / 2.1.2）。
+产物：`dist/agent.apk`（`com.buddyswitch.agent`，minSdk 24 / targetSdk 34，versionCode 8 / 2.2.0）。
 
 > ### 版本沿革
 >
@@ -25,6 +25,18 @@
 >   `cn_endpoints`，即国际版账号的签到也发往 `api.trae.cn`。现改为**主通道统一
 >   `api.trae.cn`（与 variant 无关）**、国际网关仅作回落，自动跳过网关级 404；
 >   全无路由判「未开放」，鉴权被拒给出可操作诊断，不再虚报成功或抛莫名 404。
+> - **v2.2.0（本次）**：按用户反馈做三项产品改进。
+>   ① **Qoder 国内 / 国际版去掉「领积分」按钮** —— Qoder 没有独立成长中心，
+>   签到走官方活动平台即领 100 Credits，那个按钮永远返回「跳过」，只会误导。
+>   ② **查积分补齐「每月赠送的基础 Credits」** —— 不再只给一个笼统合计：
+>   Qoder 把 `userQuota`（每月基础，PLAN）与 `addOnQuota`（资源包，BONUS）拆成明细，
+>   并尽力请求网页端逐包接口 `/api/v2/me/usages/big_model_credits` 补充分组与下月重置时间；
+>   WorkBuddy 额外请求 `get-user-resource-free-packages` 补免费月度包；
+>   Trae 按包名把月度 / 基础包与资源包分类。账号卡片分项展示
+>   **每月赠送基础 Credits / 资源包 / 加购**及逐包明细。
+>   ③ **首页新增「6 个产品」矩阵** —— WorkBuddy / Qoder / Trae × 国内 / 国际，
+>   每项显示账号数与该产品下所有账号的**汇总剩余积分**；查不到显示「待查询」而非 0。
+>   另新增**账号备注**：账号名是无意义字符时可写备注辨认（只存本机，刷新 / 同步不覆盖）。
 
 ## 能做什么
 
@@ -33,8 +45,11 @@
 | 手机独立扫码登录 | ✅ | ✅ | ❌ 见下方说明 | ❌ |
 | 粘贴凭据 / JWT 导入 | ✅ | ✅ | ✅ | ❌ |
 | 每日签到领积分 | ✅ 仅国内版 | ✅ | ✅ | ❌ |
-| 成长中心一键领取 | ✅ 仅国内版 | — 签到即领 | — 签到即领 | ❌ |
+| 成长中心一键领取 | ✅ 仅国内版 | — 签到即领（v2.2 起无此按钮） | — 签到即领 | ❌ |
 | 积分余额与到期查询 | ✅ | ✅ | ✅ | ❌ |
+| **每月基础 Credits / 资源包分项** | ✅ | ✅ | ✅ | ❌ |
+| 首页 6 产品「账号数 + 汇总积分」 | ✅ | ✅ | ✅ | ❌ |
+| 账号备注（只存本机） | ✅ | ✅ | ✅ | ❌ |
 | 定时自动签到 + 通知 | ✅ | ✅ | ✅ | ❌ |
 | 刷新凭据 | ✅ | 重贴 token | 重贴 JWT | ❌ |
 | **账号同步到电脑** | ✅ 可选 | ✅ 可选 | ✅ 可选 | 仅此手动动作 |
@@ -70,7 +85,10 @@
 4. 首页点 **一键签到并领取积分**，或账号页逐个操作、按平台筛选。
 
 > WorkBuddy 国际版**没有签到 / 成长中心接口**，可登录与查积分，签到自动跳过。
-> Qoder / Trae 的「领积分」不单独存在，签到本身即发放 Credits。
+> **Qoder 国内 / 国际版都没有「领积分」按钮**：签到本身即在官方活动平台发放 100 Credits，
+> Trae 同理；「成长中心一键领取」只对 WorkBuddy 国内版有效。
+> 「查积分」现在分项显示**每月赠送的基础 Credits**与**资源包 / 加购**，并列出逐包明细；
+> 首页「6 个产品」矩阵按产品汇总账号数与剩余积分。账号名难认时点「加备注」写备注。
 > Qoder 签到请用**扫码登录**取得的 access token；`pt-` 开头的 PAT 只能查额度，
 > 上游不允许用于活动平台领取。若活动列表里没有积分类活动，界面如实显示「未开放」
 > 而不是「跳过」或「成功」（不会谎报领取）。
@@ -97,16 +115,16 @@ assets/index.html  ←→  JsBridge.call(cbId, action, args)  ←→  PlatformRo
 
 | 文件 | 职责 |
 |:--|:--|
-| `assets/index.html` | SPA：首页 / 账号（平台筛选）/ 同步 / 设置，内嵌自研二维码编码器 |
-| `src/.../Platforms.java` | 三平台能力矩阵、标签、是否支持扫码 |
+| `assets/index.html` | SPA：首页（6 产品矩阵）/ 账号（平台筛选、备注、积分分项）/ 同步 / 设置，内嵌自研二维码编码器 |
+| `src/.../Platforms.java` | 三平台能力矩阵、6 个产品（3×2）定义与 `scopeKey`、标签、是否支持扫码 |
 | `src/.../PlatformRouter.java` | 按账号平台分派签到 / 领积分 / 查额度 / 刷新 |
-| `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、活动平台签到（campaigns + claim）、额度 |
-| `src/.../TraeApi.java` | Trae JWT 解析与导入、`api.trae.cn` 主通道多网关自适应签到 / 积分、权益包聚合、网关级 404 / 鉴权诊断 |
-| `src/.../WorkBuddyApi.java` | WorkBuddy 登录、签到、成长中心、积分、刷新、lansync |
+| `src/.../QoderApi.java` | Qoder 独立登录（PKCE + deviceToken/poll）、活动平台签到（campaigns + claim）、额度（`userQuota` 基础 / `addOnQuota` 资源包拆分 + 网页端逐包补充） |
+| `src/.../TraeApi.java` | Trae JWT 解析与导入、`api.trae.cn` 主通道多网关自适应签到 / 积分、权益包按「月度基础 / 资源包」分类、网关级 404 / 鉴权诊断 |
+| `src/.../WorkBuddyApi.java` | WorkBuddy 登录、签到、成长中心、积分（summary + 免费月度包分项）、刷新、lansync |
 | `src/.../WbVariant.java` | WorkBuddy 国内 / 国际档位域名与指纹头 |
-| `src/.../AccountStore.java` | 本机账号库，`platform` 字段隔离三平台（历史数据默认 wb） |
+| `src/.../AccountStore.java` | 本机账号库，`platform` 字段隔离三平台、`remark` 备注字段（历史数据默认 wb / 空备注） |
 | `src/.../Http.java` | 通用 HTTP(S) 引擎，`Connection: close` 避免死连接复用 |
-| `src/.../JsBridge.java` | 统一 `call` 分发 + 通知 / 打开浏览器 / 自动签到 |
+| `src/.../JsBridge.java` | 统一 `call` 分发（含 `setRemark` / `scopes` 统计）+ 通知 / 打开浏览器 / 自动签到 |
 | `src/.../AutoCheckinReceiver.java` | 本地定时签到，经 PlatformRouter 遍历全部平台 |
 
 二维码生成器为自包含实现（Byte mode / ECL-M / mask 0 / version 1–20），纠错块表由
@@ -131,7 +149,7 @@ ALLOW_REBUILD=1 ./build.sh       # 同一 versionCode 内只改资源 / SPA 时�
 | 版本号单一数据源 | `build.sh` 从 `AndroidManifest.xml` 读取，不再硬编码 |
 | 依次升号 | 已有 `dist/agent.apk` 时要求新 `versionCode` 严格大于旧值，否则拒绝构建 |
 
-当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）→ v2.1.1（6）→ v2.1.2（7）均可直接覆盖安装**；
+当前固定指纹 `2092c870…7b6c`。**v2.0.0（3）→ v2.0.1（4）→ v2.1.0（5）→ v2.1.1（6）→ v2.1.2（7）→ v2.2.0（8）均可直接覆盖安装**；
 v1.x 的私钥已永久丢失，那两个历史版本升级需卸载最后一次。
 换机 / 重新 clone 后构建必须带上整个 `signing/` 目录，详见 [signing/README.md](signing/README.md)。
 

@@ -1,4 +1,4 @@
-# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.1.2 三平台）
+# 架构演进：从「必须依赖电脑」到「手机完全独立」（v2.2.0 三平台）
 
 ## 一段需要纠正的判断
 
@@ -177,5 +177,24 @@ Trae 则在上游允许的范围内做到独立签到与查积分。
 - **Qoder 活动平台依赖上游活动列表**：账号没有积分类活动、活动限时、或国际版要求官方原生
   机器身份时，可能领不到。App 如实显示「未开放」而不是「跳过 / 成功」；`pt-` PAT 不能用于领取。
   上游每日实例在 10:00（UTC+8）切换。
+
+## v2.2.0 产品改进（用户反馈三项）
+
+这一版没有改「手机独立」这条主线，只补齐三个使用层面的缺口：
+
+| 诉求 | 根因 | 改动 |
+|:--|:--|:--|
+| 去掉 Qoder 国内 / 国际版「领积分」按钮 | `growthOne` 对 Qoder 恒 `skipped`（没有成长中心），签到即通过活动平台领 100 Credits，按钮永远「跳过」 | `accCard()` 按 `platform==='qoder'` 不渲染该按钮；`Platforms.supportsGrowth()` 保持 false 不变 |
+| 查积分补「每月赠送的基础 credits」 | v2.1 各平台只给一个聚合 `remaining`，看不出基础额度与资源包各有多少 | `QoderApi` 拆 `userQuota`(PLAN 基础) / `addOnQuota`(BONUS 资源包) 并尽力取网页端逐包分组；`WorkBuddyApi` 补 `get-user-resource-free-packages` 免费月度包；`TraeApi` 按包名分类月度基础 / 资源包。统一输出 `packages[]` 与 `base*` / `addon*` |
+| 首页显示 6 个产品的账号数与汇总积分 | 旧首页只有 WB / Qoder / Trae 三个计数 + 一个总积分，分不出国内 / 国际 | `Platforms.scopes()` 定义 6 个产品、`state.scopes[]` 带 `accountCount`，前端按 `scopeKey` 聚合 `S.credits` 得到每产品汇总积分 |
+| 账号备注 | 部分账号名是一串无意义字符，无法辨认 | `AccountStore` 加 `remark` 字段与 `setRemark()`；`JsBridge` 加 `setRemark` action；账号卡片显示备注并可编辑 / 清除 |
+
+**诚实性边界沿用全仓纪律**：
+- 附加的「每月基础 Credits」接口失败时保留主通道结果并给出 `baseHint`，不假装查到、不写 0。
+- 首页矩阵只累加成功查到的余额，查不到显示「待查询」，不把失败 / 未开放算成 0。
+- WorkBuddy 的汇总 `total/remaining` 仍以 `get-user-resource-summary` 为权威，
+  免费月度包明细只用于分类展示，**不与汇总相加**（避免两路口径重叠导致重复计数）。
+
+`versionCode 7 → 8` / `2.1.2 → 2.2.0`，固定签名指纹不变，可直接覆盖安装。
 
 逐端点契约见 [API-CONTRACT.md](API-CONTRACT.md)，故障排查见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。
